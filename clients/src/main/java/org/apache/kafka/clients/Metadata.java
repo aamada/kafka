@@ -150,6 +150,7 @@ public class Metadata implements Closeable {
     public synchronized int requestUpdateForNewTopics() {
         // Override the timestamp of last refresh to let immediate update.
         this.lastRefreshMs = 0;
+        // 分区数量需要更新
         this.needPartialUpdate = true;
         this.requestVersion++;
         return this.updateVersion;
@@ -267,6 +268,7 @@ public class Metadata implements Closeable {
 
         this.needPartialUpdate = requestVersion < this.requestVersion;
         this.lastRefreshMs = nowMs;
+        // 更新元数据的版本号， 使其值增加， 注意这里也是使用sychronized来控制的
         this.updateVersion += 1;
         if (!isPartialUpdate) {
             this.needFullUpdate = false;
@@ -275,8 +277,10 @@ public class Metadata implements Closeable {
 
         String previousClusterId = cache.clusterResource().clusterId();
 
+        // 处理返回值的东西
         this.cache = handleMetadataResponse(response, isPartialUpdate, nowMs);
 
+        // 集群信息
         Cluster cluster = cache.cluster();
         maybeSetMetadataError(cluster);
 
@@ -313,6 +317,8 @@ public class Metadata implements Closeable {
 
     /**
      * Transform a MetadataResponse into a new MetadataCache instance.
+     *
+     * 处理从broker得到的关于主题与分区的信息， 把它封装到缓存中去
      */
     private MetadataCache handleMetadataResponse(MetadataResponse metadataResponse, boolean isPartialUpdate, long nowMs) {
         // All encountered topics.

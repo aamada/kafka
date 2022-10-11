@@ -556,8 +556,17 @@ public class NetworkClient implements KafkaClient {
             return responses;
         }
 
+        // 封装一个请求
         long metadataTimeout = metadataUpdater.maybeUpdate(now);
         try {
+            /*
+             * 这里就是去拉取元数据信息
+             * 这里涉及到kafka的网络的方法， 但是目前我们还没有看到kafka的网络部分， 先不看那么详细
+             * 等后面来看这里的详细信息
+             *
+             * 这里还是挺难的
+             * todo 这里还是不知道怎么去发送的
+             */
             this.selector.poll(Utils.min(timeout, metadataTimeout, defaultRequestTimeoutMs));
         } catch (IOException e) {
             log.error("Unexpected error during I/O", e);
@@ -567,6 +576,7 @@ public class NetworkClient implements KafkaClient {
         long updatedNow = this.time.milliseconds();
         List<ClientResponse> responses = new ArrayList<>();
         handleCompletedSends(responses, updatedNow);
+        // 这里处理，那些成功收到消息的请求
         handleCompletedReceives(responses, updatedNow);
         handleDisconnections(responses, updatedNow);
         handleConnections();
@@ -869,9 +879,11 @@ public class NetworkClient implements KafkaClient {
      */
     private void handleCompletedReceives(List<ClientResponse> responses, long now) {
         for (NetworkReceive receive : this.selector.completedReceives()) {
+            // 收到的消息
             String source = receive.source();
             InFlightRequest req = inFlightRequests.completeNext(source);
 
+            // 解析返回
             AbstractResponse response = parseResponse(receive.payload(), req.header);
             if (throttleTimeSensor != null)
                 throttleTimeSensor.record(response.throttleTimeMs(), now);
@@ -884,6 +896,7 @@ public class NetworkClient implements KafkaClient {
             // If the received response includes a throttle delay, throttle the connection.
             maybeThrottle(response, req.header.apiVersion(), req.destination, now);
             if (req.isInternalRequest && response instanceof MetadataResponse)
+                // 如果是元数据的更新
                 metadataUpdater.handleSuccessfulResponse(req.header, now, (MetadataResponse) response);
             else if (req.isInternalRequest && response instanceof ApiVersionsResponse)
                 handleApiVersionsResponse(responses, req, now, (ApiVersionsResponse) response);
@@ -1024,6 +1037,12 @@ public class NetworkClient implements KafkaClient {
             return inProgress != null;
         }
 
+        /**
+         * 更新元数据信息
+         *
+         * @param now 2022年10月11日08:19:17
+         * @return
+         */
         @Override
         public long maybeUpdate(long now) {
             // should we update our metadata?
@@ -1083,6 +1102,7 @@ public class NetworkClient implements KafkaClient {
             // If any partition has leader with missing listeners, log up to ten of these partitions
             // for diagnosing broker configuration issues.
             // This could be a transient issue if listeners were added dynamically to brokers.
+            // 主题分区
             List<TopicPartition> missingListenerPartitions = response.topicMetadata().stream().flatMap(topicMetadata ->
                 topicMetadata.partitionMetadata().stream()
                     .filter(partitionMetadata -> partitionMetadata.error == Errors.LISTENER_NOT_FOUND)
@@ -1103,8 +1123,12 @@ public class NetworkClient implements KafkaClient {
             // created which means we will get errors and no nodes until it exists
             if (response.brokers().isEmpty()) {
                 log.trace("Ignoring empty metadata response with correlation id {}.", requestHeader.correlationId());
+                // 更新失败
                 this.metadata.failedUpdate(now);
             } else {
+                // 这里去更新元数据信息
+                // 注意这里的更新方法
+                // 这里的这个metadata是一个producerMetadata
                 this.metadata.update(inProgress.requestVersion, response, inProgress.isPartialUpdate, now);
             }
 
@@ -1130,6 +1154,8 @@ public class NetworkClient implements KafkaClient {
 
         /**
          * Add a metadata request to the list of sends if we can make one
+         *
+         * 如果可以新增的话， 那么新增一个新的请求到list中去
          */
         private long maybeUpdate(long now, Node node) {
             String nodeConnectionId = node.idString();

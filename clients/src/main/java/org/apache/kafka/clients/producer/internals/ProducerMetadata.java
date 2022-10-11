@@ -74,8 +74,12 @@ public class ProducerMetadata extends Metadata {
 
     public synchronized int requestUpdateForTopic(String topic) {
         if (newTopics.contains(topic)) {
+            // 如果新的主题包含这个主题
+            // 返回的居然是更新版本号
             return requestUpdateForNewTopics();
         } else {
+            // 如果不包含， 那么直接更新
+            // 返回的也是更新的版本号
             return requestUpdate();
         }
     }
@@ -112,22 +116,32 @@ public class ProducerMetadata extends Metadata {
 
     /**
      * Wait for metadata update until the current version is larger than the last version we know of
+     *
+     * 看这个方法的签名， 它是用synchronized修饰的
+     *
+     * 如果它更新完成， 它会唤醒这里的， 如果这个方法抢到了锁， 那么这个方法就会走下去
      */
     public synchronized void awaitUpdate(final int lastVersion, final long timeoutMs) throws InterruptedException {
+        // 当前时间
         long currentTimeMs = time.milliseconds();
+        // 截止时间
         long deadlineMs = currentTimeMs + timeoutMs < 0 ? Long.MAX_VALUE : currentTimeMs + timeoutMs;
+        // 这个线程就卡在这里了， 一直等待到有线程来通知它， 直到超过截止时间
+        // 要不就是被通知到了， 要不就是超过截止时间了
         time.waitObject(this, () -> {
             // Throw fatal exceptions, if there are any. Recoverable topic errors will be handled by the caller.
             maybeThrowFatalException();
             return updateVersion() > lastVersion || isClosed();
         }, deadlineMs);
 
+        // 是否已经关闭了？
         if (isClosed())
             throw new KafkaException("Requested metadata update after close");
     }
 
     @Override
     public synchronized void update(int requestVersion, MetadataResponse response, boolean isPartialUpdate, long nowMs) {
+        // 调用父类的更新方法
         super.update(requestVersion, response, isPartialUpdate, nowMs);
 
         // Remove all topics in the response that are in the new topic set. Note that if an error was encountered for a
@@ -137,7 +151,7 @@ public class ProducerMetadata extends Metadata {
                 newTopics.remove(metadata.topic());
             }
         }
-
+        // 这里去唤醒， metadata的阻塞线程， 因为， 那个发送消息的方法， 可能会阻塞住的
         notifyAll();
     }
 

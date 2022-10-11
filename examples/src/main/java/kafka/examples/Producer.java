@@ -27,8 +27,28 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Producer extends Thread {
+    private static AtomicInteger num = new AtomicInteger(0);
+    public static void main(String[] args) {
+        for (int i = 0; i < 10000; i++) {
+            Thread thread = new Thread(() -> {
+                while (true) {
+                    int res = num.getAndAdd(1);
+                    if (res > Integer.MAX_VALUE) {
+                        num.set(0);
+                    }
+                    System.err.println(Thread.currentThread().getName() + ": num = " + num.get());
+                }
+            });
+            thread.setDaemon(true);
+            thread.start();
+        }
+        while (true) {
+
+        }
+    }
     private final KafkaProducer<Integer, String> producer;
     private final String topic;
     private final Boolean isAsync;

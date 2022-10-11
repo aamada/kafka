@@ -188,14 +188,18 @@ public final class RecordAccumulator {
                                      long nowMs) throws InterruptedException {
         // We keep track of the number of appending thread to make sure we do not miss batches in
         // abortIncompleteBatches().
+        // 1. appendsInProgress是一个integer, 增加数量呗
         appendsInProgress.incrementAndGet();
+        // 2. 一个容器
         ByteBuffer buffer = null;
         if (headers == null) headers = Record.EMPTY_HEADERS;
         try {
             // check if we have an in-progress batch
+            // 3. 找这个消息分区的队列
             Deque<ProducerBatch> dq = getOrCreateDeque(tp);
             synchronized (dq) {
                 if (closed)
+                    // 如果已经关闭那么， 直接抛出异常
                     throw new KafkaException("Producer closed while send in progress");
                 RecordAppendResult appendResult = tryAppend(timestamp, key, value, headers, callback, dq, nowMs);
                 if (appendResult != null)
@@ -263,8 +267,10 @@ public final class RecordAccumulator {
      */
     private RecordAppendResult tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers,
                                          Callback callback, Deque<ProducerBatch> deque, long nowMs) {
+        // 从队列里拿出来最后的一个批次
         ProducerBatch last = deque.peekLast();
         if (last != null) {
+            // 如果这个批次不为空， 那么将这个消息给添加到这个批次里面去
             FutureRecordMetadata future = last.tryAppend(timestamp, key, value, headers, callback, nowMs);
             if (future == null)
                 last.closeForRecordAppends();
@@ -654,14 +660,21 @@ public final class RecordAccumulator {
      * Get the deque for the given topic-partition, creating it if necessary.
      */
     private Deque<ProducerBatch> getOrCreateDeque(TopicPartition tp) {
+        // batchs = ConcurrentMap<TopicPartition, Deque<ProducerBatch>>
+        // batches是一个map， 以topicPartition为key， 找到一个队列
         Deque<ProducerBatch> d = this.batches.get(tp);
         if (d != null)
+            // 如果这个队列不为空， 那么直接返回
             return d;
+        // 如果为空， 那么新建一个队列
         d = new ArrayDeque<>();
+        // 将这个队列给放入至这个batches中去
         Deque<ProducerBatch> previous = this.batches.putIfAbsent(tp, d);
         if (previous == null)
+            // 如果之前的没有， 那么返回这个新建的
             return d;
         else
+            // 如果有老的， 那么返回这个老的
             return previous;
     }
 

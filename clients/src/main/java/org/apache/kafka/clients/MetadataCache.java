@@ -204,6 +204,14 @@ public class MetadataCache {
                 .stream()
                 .map(metadata -> MetadataResponse.toPartitionInfo(metadata, nodes))
                 .collect(Collectors.toList());
+        // 集群的id
+        // 服务器的节点信息
+        // 分区信息
+        // 没有认证的主题
+        // 不可用的主题
+        // 内部主题
+        // controllelr
+        // 主题id
         this.clusterInstance = new Cluster(clusterId, nodes.values(), partitionInfos, unauthorizedTopics,
                 invalidTopics, internalTopics, controller, topicIds);
     }
