@@ -73,18 +73,23 @@ public class Sender implements Runnable {
     private final Logger log;
 
     /* the state of each nodes connection */
+    // 每一个节点的连接状态
     private final KafkaClient client;
 
     /* the record accumulator that batches records */
+    // 消息累加器
     private final RecordAccumulator accumulator;
 
     /* the metadata for the client */
+    // 生产者元数据
     private final ProducerMetadata metadata;
 
     /* the flag indicating whether the producer should guarantee the message order on the broker or not. */
+    // 是否保证消息的有序
     private final boolean guaranteeMessageOrder;
 
     /* the maximum request size to attempt to send to the server */
+    // 最大的请求数
     private final int maxRequestSize;
 
     /* the number of acknowledgements to request from the server */
@@ -324,12 +329,16 @@ public class Sender implements Runnable {
 
         long currentTimeMs = time.milliseconds();
         long pollTimeout = sendProducerData(currentTimeMs);
+        // 拉取元数据去喽
         client.poll(pollTimeout, currentTimeMs);
     }
 
+    // 发送数据去喽~~
     private long sendProducerData(long now) {
+        // 元数据
         Cluster cluster = metadata.fetch();
         // get the list of partitions with data ready to send
+        // 拿到一个已经准备好的分区
         RecordAccumulator.ReadyCheckResult result = this.accumulator.ready(cluster, now);
 
         // if there are any partitions whose leaders are not known yet, force metadata update
@@ -337,11 +346,13 @@ public class Sender implements Runnable {
             // The set of topics with unknown leader contains topics with leader election pending as well as
             // topics which may have expired. Add the topic again to metadata to ensure it is included
             // and request metadata update, since there are messages to send to the topic.
+            // 如果有不知道的主题
             for (String topic : result.unknownLeaderTopics)
                 this.metadata.add(topic, now);
 
             log.debug("Requesting metadata update due to unknown leader topics from the batched records: {}",
                 result.unknownLeaderTopics);
+            // 需要发送一个请求到broker， 去看一下， 有没有这个主题
             this.metadata.requestUpdate();
         }
 
@@ -351,12 +362,13 @@ public class Sender implements Runnable {
         while (iter.hasNext()) {
             Node node = iter.next();
             if (!this.client.ready(node, now)) {
+                // 校验这些个服务器， 能否连接
                 iter.remove();
                 notReadyTimeout = Math.min(notReadyTimeout, this.client.pollDelayMs(node, now));
             }
         }
 
-        // create produce requests
+        // create produce requests 创建生产请求
         Map<Integer, List<ProducerBatch>> batches = this.accumulator.drain(cluster, result.readyNodes, this.maxRequestSize, now);
         addToInflightBatches(batches);
         if (guaranteeMessageOrder) {
@@ -367,6 +379,7 @@ public class Sender implements Runnable {
             }
         }
 
+        // 重置下一个批次的过期时间
         accumulator.resetNextBatchExpiryTime();
         List<ProducerBatch> expiredInflightBatches = getExpiredInflightBatches(now);
         List<ProducerBatch> expiredBatches = this.accumulator.expiredBatches(now);

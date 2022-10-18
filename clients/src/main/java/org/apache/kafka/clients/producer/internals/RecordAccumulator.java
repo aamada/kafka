@@ -197,6 +197,7 @@ public final class RecordAccumulator {
             // check if we have an in-progress batch
             // 3. 找这个消息分区的队列
             Deque<ProducerBatch> dq = getOrCreateDeque(tp);
+            // 锁住这个队列
             synchronized (dq) {
                 if (closed)
                     // 如果已经关闭那么， 直接抛出异常
@@ -213,8 +214,10 @@ public final class RecordAccumulator {
             }
 
             byte maxUsableMagic = apiVersions.maxUsableProduceMagic();
+            // 一个批次大？还是这个消息的大小大？， 那么 大， 要那个的值
             int size = Math.max(this.batchSize, AbstractRecords.estimateSizeInBytesUpperBound(maxUsableMagic, compression, key, value, headers));
             log.trace("Allocating a new {} byte message buffer for topic {} partition {} with remaining timeout {}ms", size, tp.topic(), tp.partition(), maxTimeToBlock);
+            // 分配内存， 这里挺复杂的
             buffer = free.allocate(size, maxTimeToBlock);
 
             // Update the current time in case the buffer allocation blocked above.
@@ -231,6 +234,7 @@ public final class RecordAccumulator {
                 }
 
                 MemoryRecordsBuilder recordsBuilder = recordsBuilder(buffer, maxUsableMagic);
+                // 新建批次
                 ProducerBatch batch = new ProducerBatch(tp, recordsBuilder, nowMs);
                 FutureRecordMetadata future = Objects.requireNonNull(batch.tryAppend(timestamp, key, value, headers,
                         callback, nowMs));
@@ -277,6 +281,7 @@ public final class RecordAccumulator {
             else
                 return new RecordAppendResult(future, deque.size() > 1 || last.isFull(), false, false);
         }
+        // 这里的last没有， 只能为null， 因为还没有内存， 批次等信息
         return null;
     }
 
@@ -450,23 +455,35 @@ public final class RecordAccumulator {
         Set<Node> readyNodes = new HashSet<>();
         long nextReadyCheckDelayMs = Long.MAX_VALUE;
         Set<String> unknownLeaderTopics = new HashSet<>();
-
+        // 如果true， 那么说明内存已经不够了， 有线程在等待着， 别的线程释放内存
         boolean exhausted = this.free.queued() > 0;
+        // 主题分区对应的批次消息队列
         for (Map.Entry<TopicPartition, Deque<ProducerBatch>> entry : this.batches.entrySet()) {
+            // 拿出队列
             Deque<ProducerBatch> deque = entry.getValue();
             synchronized (deque) {
                 // When producing to a large number of partitions, this path is hot and deques are often empty.
                 // We check whether a batch exists first to avoid the more expensive checks whenever possible.
+                // 拿出每一个批次
                 ProducerBatch batch = deque.peekFirst();
                 if (batch != null) {
+                    // 这个消息批次对应的主题分区
                     TopicPartition part = entry.getKey();
+                    // 找到主分区
                     Node leader = cluster.leaderFor(part);
                     if (leader == null) {
                         // This is a partition for which leader is not known, but messages are available to send.
                         // Note that entries are currently not removed from batches when deque is empty.
+                        // 如果没有找到对应的主机， 记录一下
                         unknownLeaderTopics.add(part.topic());
                     } else if (!readyNodes.contains(leader) && !isMuted(part)) {
+                        // 已经找到了主分区 ， 但是呢， 已经知道的节点里， 并不包含这个节点， 并且， 是不可变的
+                        // 这里是这个批次已经创建多久了？
                         long waitedTimeMs = batch.waitedTimeMs(nowMs);
+                        /**
+                         * 重试次数>0
+                         * 等待的时间 小于 重试的间隔时间
+                         */
                         boolean backingOff = batch.attempts() > 0 && waitedTimeMs < retryBackoffMs;
                         long timeToWaitMs = backingOff ? retryBackoffMs : lingerMs;
                         boolean full = deque.size() > 1 || batch.isFull();

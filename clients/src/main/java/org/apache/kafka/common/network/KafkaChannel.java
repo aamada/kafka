@@ -174,10 +174,15 @@ public class KafkaChannel implements AutoCloseable {
     public void prepare() throws AuthenticationException, IOException {
         boolean authenticating = false;
         try {
+            // 传输层还没有准备好
             if (!transportLayer.ready())
+                // 开始三次握手
                 transportLayer.handshake();
             if (transportLayer.ready() && !authenticator.complete()) {
+                // 传输层准备好了， 并且， 还没有授权完成
+                // 将授权状态进行修改
                 authenticating = true;
+                // 进行授权
                 authenticator.authenticate();
             }
         } catch (AuthenticationException e) {
@@ -198,11 +203,13 @@ public class KafkaChannel implements AutoCloseable {
     }
 
     public void disconnect() {
+        // 设置一个标记
         disconnected = true;
         if (state == ChannelState.NOT_CONNECTED && remoteAddress != null) {
             //if we captured the remote address we can provide more information
             state = new ChannelState(ChannelState.State.NOT_CONNECTED, remoteAddress.toString());
         }
+        // 传输层断开连接
         transportLayer.disconnect();
     }
 
@@ -352,6 +359,7 @@ public class KafkaChannel implements AutoCloseable {
     }
 
     public boolean ready() {
+        // 传输层已经准备好， 并且 已经授权完成
         return transportLayer.ready() && authenticator.complete();
     }
 
