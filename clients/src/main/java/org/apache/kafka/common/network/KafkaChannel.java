@@ -21,6 +21,7 @@ import org.apache.kafka.common.errors.SslAuthenticationException;
 import org.apache.kafka.common.memory.MemoryPool;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.common.security.auth.KafkaPrincipalSerde;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Utils;
 
 import java.io.IOException;
@@ -228,6 +229,7 @@ public class KafkaChannel implements AutoCloseable {
         if (socketChannel != null) {
             remoteAddress = socketChannel.getRemoteAddress();
         }
+        // 这里去调用传输层的连接结果事件
         boolean connected = transportLayer.finishConnect();
         if (connected) {
             if (ready()) {
@@ -387,6 +389,7 @@ public class KafkaChannel implements AutoCloseable {
     public void setSend(NetworkSend send) {
         if (this.send != null)
             throw new IllegalStateException("Attempt to begin a send operation with prior send operation still in progress, connection id is " + id);
+        PrintUitls.printToConsole("给channel设置一个发送器， 并注册一个读事件");
         this.send = send;
         this.transportLayer.addInterestOps(SelectionKey.OP_WRITE);
     }

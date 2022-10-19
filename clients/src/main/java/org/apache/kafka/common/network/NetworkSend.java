@@ -16,6 +16,9 @@
  */
 package org.apache.kafka.common.network;
 
+
+import org.apache.kafka.common.utils.PrintUitls;
+
 import java.io.IOException;
 
 public class NetworkSend implements Send {
@@ -24,6 +27,7 @@ public class NetworkSend implements Send {
 
     public NetworkSend(String destinationId, Send send) {
         this.destinationId = destinationId;
+        PrintUitls.printToConsole("创建NetworkSend， send = " + send.toString());
         this.send = send;
     }
 

@@ -30,6 +30,7 @@ import org.apache.kafka.common.metrics.stats.Meter;
 import org.apache.kafka.common.metrics.stats.SampledStat;
 import org.apache.kafka.common.metrics.stats.WindowedCount;
 import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
@@ -524,6 +525,7 @@ public class Selector implements Selectable, AutoCloseable {
                 /* complete any connections that have finished their handshake (either normally or immediately) */
                 // 连接事件
                 if (isImmediatelyConnected || key.isConnectable()) {
+                    // 如果已经连接成功
                     if (channel.finishConnect()) {
                         this.connected.add(nodeId);
                         this.sensors.connectionCreated.record();
@@ -719,11 +721,13 @@ public class Selector implements Selectable, AutoCloseable {
 
     @Override
     public List<NetworkSend> completedSends() {
+        PrintUitls.printToConsole("完成了多少个发送事件?");
         return this.completedSends;
     }
 
     @Override
     public Collection<NetworkReceive> completedReceives() {
+        PrintUitls.printToConsole("完成了多少个接收？");
         return this.completedReceives.values();
     }
 

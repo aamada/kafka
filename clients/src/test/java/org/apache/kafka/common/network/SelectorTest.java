@@ -27,6 +27,7 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.MockTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.test.TestCondition;
 import org.apache.kafka.test.TestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -228,7 +229,9 @@ public class SelectorTest {
 
         // loop until we complete all requests
         while (responseCount < conns * reqs) {
+            PrintUitls.printToConsole("如果返回的响应次数小于请求的次数， 那么一直接循环");
             // do the i/o
+            PrintUitls.printToConsole("做io请求");
             selector.poll(0L);
 
             assertEquals(0, selector.disconnected().size(), "No disconnects should have occurred.");
