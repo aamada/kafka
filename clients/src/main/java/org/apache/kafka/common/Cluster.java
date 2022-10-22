@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.common;
 
+import org.apache.kafka.common.utils.PrintUitls;
+
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -293,6 +295,7 @@ public final class Cluster {
      */
     public Integer partitionCountForTopic(String topic) {
         List<PartitionInfo> partitions = this.partitionsByTopic.get(topic);
+        PrintUitls.printToConsole("看这个topic有多少个partition = " + (partitions == null ? null : partitions.size()));
         return partitions == null ? null : partitions.size();
     }
 

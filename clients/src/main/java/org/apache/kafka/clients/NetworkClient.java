@@ -43,6 +43,7 @@ import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.requests.RequestHeader;
 import org.apache.kafka.common.security.authenticator.SaslClientAuthenticator;
 import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
@@ -473,6 +474,7 @@ public class NetworkClient implements KafkaClient {
     }
 
     private void doSend(ClientRequest clientRequest, boolean isInternalRequest, long now) {
+        // todo 到这里了
         ensureActive();
         String nodeId = clientRequest.destination();
         if (!isInternalRequest) {
@@ -527,7 +529,9 @@ public class NetworkClient implements KafkaClient {
             log.debug("Sending {} request with header {} and timeout {} to node {}: {}",
                 clientRequest.apiKey(), header, clientRequest.requestTimeoutMs(), destination, request);
         }
+        PrintUitls.printToConsole("新建一个send");
         Send send = request.toSend(header);
+        PrintUitls.printToConsole("新建一个InFlightRequest");
         InFlightRequest inFlightRequest = new InFlightRequest(
                 clientRequest,
                 header,
@@ -535,6 +539,7 @@ public class NetworkClient implements KafkaClient {
                 request,
                 send,
                 now);
+        PrintUitls.printToConsole("把刚才建立的inFlightRequest, 放入至inFlightRequests中去");
         this.inFlightRequests.add(inFlightRequest);
         selector.send(new NetworkSend(clientRequest.destination(), send));
     }
@@ -883,6 +888,7 @@ public class NetworkClient implements KafkaClient {
      * @param now The current time
      */
     private void handleCompletedReceives(List<ClientResponse> responses, long now) {
+//        PrintUitls.printToConsole("这里来处理理， 之前从channel里读取到的, 并放入至completedReceives数据");
         for (NetworkReceive receive : this.selector.completedReceives()) {
             // 收到的消息
             String source = receive.source();

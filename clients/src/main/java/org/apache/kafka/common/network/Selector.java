@@ -56,6 +56,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
+
 /**
  * A nioSelector interface for doing non-blocking multi-connection network I/O.
  * <p>
@@ -392,6 +394,7 @@ public class Selector implements Selectable, AutoCloseable {
             this.failedSends.add(connectionId);
         } else {
             try {
+                printToConsole("使用kafkachannel去发送消息， 这个消息是放入到send中去的， 这个send， 每次都是新建一个");
                 channel.setSend(send);
             } catch (Exception e) {
                 // update the state for consistency, the channel will be discarded after `close`
@@ -446,6 +449,7 @@ public class Selector implements Selectable, AutoCloseable {
         clear();
 
         boolean dataInBuffers = !keysWithBufferedRead.isEmpty();
+//        PrintUitls.printToConsole("dataInBuffers中有值吗？dataInBuffers = " + dataInBuffers);
 
         if (!immediatelyConnectedKeys.isEmpty() || (madeReadProgressLastCall && dataInBuffers))
             timeout = 0;
@@ -463,15 +467,19 @@ public class Selector implements Selectable, AutoCloseable {
 
         /* check ready keys */
         long startSelect = time.nanoseconds();
+//        PrintUitls.printToConsole("在这里阻塞住， 等待事件的发生");
         int numReadyKeys = select(timeout);
         long endSelect = time.nanoseconds();
         this.sensors.selectTime.record(endSelect - startSelect, time.milliseconds());
 
         if (numReadyKeys > 0 || !immediatelyConnectedKeys.isEmpty() || dataInBuffers) {
+            printToConsole("如果有事件的话， 那么把事件key给拿出来");
             Set<SelectionKey> readyKeys = this.nioSelector.selectedKeys();
 
+            // todo 下面为什么会有三个调用处理key的方法
             // Poll from channels that have buffered data (but nothing more from the underlying socket)
             if (dataInBuffers) {
+                printToConsole("dataInBuffers=true");
                 keysWithBufferedRead.removeAll(readyKeys); //so no channel gets polled twice
                 Set<SelectionKey> toPoll = keysWithBufferedRead;
                 keysWithBufferedRead = new HashSet<>(); //poll() calls will repopulate if needed
@@ -510,6 +518,7 @@ public class Selector implements Selectable, AutoCloseable {
     void pollSelectionKeys(Set<SelectionKey> selectionKeys,
                            boolean isImmediatelyConnected,
                            long currentTimeNanos) {
+        printToConsole("key size = " + selectionKeys.size()+ "isImmediatelyConnected = " + isImmediatelyConnected + ";currentTimeNanos = " + currentTimeNanos);
         for (SelectionKey key : determineHandlingOrder(selectionKeys)) {
             KafkaChannel channel = channel(key);
             long channelStartTimeNanos = recordTimePerConnection ? time.nanoseconds() : 0;
@@ -544,6 +553,7 @@ public class Selector implements Selectable, AutoCloseable {
                 /* if channel is not ready finish prepare */
                 if (channel.isConnected() && !channel.ready()) {
                     // 会去认证
+                    printToConsole("channel已经连接了， 但是没有准备好， 现在要去准备， 也就是认证呗");
                     channel.prepare();
                     if (channel.ready()) {
                         long readyTimeMs = time.milliseconds();
@@ -582,12 +592,14 @@ public class Selector implements Selectable, AutoCloseable {
                 }
 
                 if (channel.hasBytesBuffered()) {
+                    // 其实就是这里没有讲完， 但是呢， 下一次， 可能在selector事件中， 没有这个channel， 所以将这个给存储起来
                     //this channel has bytes enqueued in intermediary buffers that we could not read
                     //(possibly because no memory). it may be the case that the underlying socket will
                     //not come up in the next poll() and so we need to remember this channel for the
                     //next poll call otherwise data may be stuck in said buffers forever. If we attempt
                     //to process buffered data and no progress is made, the channel buffered status is
                     //cleared to avoid the overhead of checking every time.
+                    printToConsole("如果还有数据要读， 那么将数据给放入到keysWithBufferedRead中去");
                     keysWithBufferedRead.add(key);
                 }
 
@@ -640,6 +652,7 @@ public class Selector implements Selectable, AutoCloseable {
                 && channel.ready()
                 && key.isWritable()
                 && !channel.maybeBeginClientReauthentication(() -> nowNanos)) {
+            printToConsole("有数据可写");
             write(channel);
         }
     }
@@ -675,22 +688,29 @@ public class Selector implements Selectable, AutoCloseable {
     }
 
     private void attemptRead(KafkaChannel channel) throws IOException {
+        printToConsole("读事件, 拿到channel的id");
         String nodeId = channel.id();
 
+        printToConsole("这里的读取数据， 其实是委派给了KafkaChannel传输层来处理的");
         long bytesReceived = channel.read();
+        printToConsole("接收到"+bytesReceived+"字节的数据");
         if (bytesReceived != 0) {
             long currentTimeMs = time.milliseconds();
             sensors.recordBytesReceived(nodeId, bytesReceived, currentTimeMs);
             madeReadProgressLastPoll = true;
 
+            printToConsole("读取到了数据" +bytesReceived+"个的数据");
             NetworkReceive receive = channel.maybeCompleteReceive();
             if (receive != null) {
+                printToConsole("这里就是将接收完成的消息给放入到completedReceives里去");
                 addToCompletedReceives(channel, receive, currentTimeMs);
             }
         }
         if (channel.isMuted()) {
+            printToConsole("这里是什么意思呢？内存用完了， 所以保持静默状态？");
             outOfMemory = true; //channel has muted itself due to memory pressure.
         } else {
+            printToConsole("设置madeReadProgressLastPoll = true");
             madeReadProgressLastPoll = true;
         }
     }
@@ -721,13 +741,13 @@ public class Selector implements Selectable, AutoCloseable {
 
     @Override
     public List<NetworkSend> completedSends() {
-        PrintUitls.printToConsole("完成了多少个发送事件?");
+//        PrintUitls.printToConsole("完成了多少个发送事件?");
         return this.completedSends;
     }
 
     @Override
     public Collection<NetworkReceive> completedReceives() {
-        PrintUitls.printToConsole("完成了多少个接收？");
+//        PrintUitls.printToConsole("完成了多少个接收？");
         return this.completedReceives.values();
     }
 
@@ -783,6 +803,7 @@ public class Selector implements Selectable, AutoCloseable {
             return;
 
         while (!delayedClosingChannels.isEmpty()) {
+            printToConsole("如果deloyedClosingChannels不为空的话， 那么逐个遍历， 并关闭掉");
             DelayedAuthenticationFailureClose delayedClose = delayedClosingChannels.values().iterator().next();
             if (!delayedClose.tryClose(currentTimeNanos))
                 break;
@@ -1053,7 +1074,7 @@ public class Selector implements Selectable, AutoCloseable {
     private void addToCompletedReceives(KafkaChannel channel, NetworkReceive networkReceive, long currentTimeMs) {
         if (hasCompletedReceive(channel))
             throw new IllegalStateException("Attempting to add second completed receive to channel " + channel.id());
-
+        printToConsole("将接收到的数据放入至completedReceives中去");
         this.completedReceives.put(channel.id(), networkReceive);
         sensors.recordCompletedReceive(channel.id(), networkReceive.size(), currentTimeMs);
     }

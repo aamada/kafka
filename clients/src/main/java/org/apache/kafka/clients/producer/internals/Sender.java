@@ -49,6 +49,7 @@ import org.apache.kafka.common.requests.ProduceRequest;
 import org.apache.kafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.requests.RequestHeader;
 import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 
@@ -63,6 +64,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 /**
  * The background thread that handles the sending of produce requests to the Kafka cluster. This thread makes metadata
@@ -139,6 +141,7 @@ public class Sender implements Runnable {
                   long retryBackoffMs,
                   TransactionManager transactionManager,
                   ApiVersions apiVersions) {
+        printToConsole("创建一个发送器Send");
         this.log = logContext.logger(Sender.class);
         this.client = client;
         this.accumulator = accumulator;
@@ -158,10 +161,12 @@ public class Sender implements Runnable {
     }
 
     public List<ProducerBatch> inFlightBatches(TopicPartition tp) {
+        printToConsole("来inFlightBatches中拿topicPartition的List<ProducerBatch>");
         return inFlightBatches.containsKey(tp) ? inFlightBatches.get(tp) : new ArrayList<>();
     }
 
     private void maybeRemoveFromInflightBatches(ProducerBatch batch) {
+        printToConsole("Map<TopicPartition, List<ProducerBatch>> -> batchs -> batch , 如果找不到这个batch， 那么将这个tp从这个inFlightBatches中移除");
         List<ProducerBatch> batches = inFlightBatches.get(batch.topicPartition);
         if (batches != null) {
             batches.remove(batch);
@@ -180,6 +185,7 @@ public class Sender implements Runnable {
      *  Get the in-flight batches that has reached delivery timeout.
      */
     private List<ProducerBatch> getExpiredInflightBatches(long now) {
+        printToConsole("拿过期的batches");
         List<ProducerBatch> expiredBatches = new ArrayList<>();
 
         for (Iterator<Map.Entry<TopicPartition, List<ProducerBatch>>> batchIt = inFlightBatches.entrySet().iterator(); batchIt.hasNext();) {
@@ -551,6 +557,7 @@ public class Sender implements Runnable {
      * Handle a produce response
      */
     private void handleProduceResponse(ClientResponse response, Map<TopicPartition, ProducerBatch> batches, long now) {
+        printToConsole("现在执行的是一个回调函数， 当请求返回时， 被调用， 这是在新建ClientRequest时， 创建的， 并放入到了ClientRequest到了里面");
         RequestHeader requestHeader = response.requestHeader();
         int correlationId = requestHeader.correlationId();
         if (response.wasDisconnected()) {
@@ -748,6 +755,7 @@ public class Sender implements Runnable {
      * Create a produce request from the given record batches
      */
     private void sendProduceRequest(long now, int destination, short acks, int timeout, List<ProducerBatch> batches) {
+        printToConsole("now = " +now+ "destination = " +destination+ "ack = " +acks+ "timeout = " +timeout+ "list size = " + batches.size());
         if (batches.isEmpty())
             return;
 
@@ -761,6 +769,8 @@ public class Sender implements Runnable {
         }
         ProduceRequestData.TopicProduceDataCollection tpd = new ProduceRequestData.TopicProduceDataCollection();
         for (ProducerBatch batch : batches) {
+            printToConsole("遍历每一个批次");
+            // 主题分析
             TopicPartition tp = batch.topicPartition;
             MemoryRecords records = batch.records();
 
@@ -789,17 +799,21 @@ public class Sender implements Runnable {
             transactionalId = transactionManager.transactionalId();
         }
 
+        printToConsole("创建ProduceRequest.Builder");
         ProduceRequest.Builder requestBuilder = ProduceRequest.forMagic(minUsedMagic,
                 new ProduceRequestData()
                         .setAcks(acks)
                         .setTimeoutMs(timeout)
                         .setTransactionalId(transactionalId)
                         .setTopicData(tpd));
+        printToConsole("这里是一个回调函数， 当请求返回时， 就调用这里面的方法");
         RequestCompletionHandler callback = response -> handleProduceResponse(response, recordsByPartition, time.milliseconds());
 
         String nodeId = Integer.toString(destination);
+        printToConsole("创建ClientRequest， 这里面有节点id， requestBuilder， 当前时间， acks, 时间毫秒数， 回调函数");
         ClientRequest clientRequest = client.newClientRequest(nodeId, requestBuilder, now, acks != 0,
                 requestTimeoutMs, callback);
+        printToConsole("使用client发送消息clientRequest");
         client.send(clientRequest, now);
         log.trace("Sent produce request to {}: {}", nodeId, requestBuilder);
     }

@@ -17,6 +17,7 @@
 package org.apache.kafka.common.network;
 
 import org.apache.kafka.common.memory.MemoryPool;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +50,7 @@ public class NetworkReceive implements Receive {
         this.size = null;
         this.maxSize = UNLIMITED;
         this.memoryPool = MemoryPool.NONE;
+        PrintUitls.printToConsole("new a NetworkReceive, String source, ByteBuffer buffer");
     }
 
     public NetworkReceive(String source) {
@@ -57,6 +59,7 @@ public class NetworkReceive implements Receive {
         this.buffer = null;
         this.maxSize = UNLIMITED;
         this.memoryPool = MemoryPool.NONE;
+        PrintUitls.printToConsole("new a NetworkReceive, String source");
     }
 
     public NetworkReceive(int maxSize, String source) {
@@ -65,6 +68,7 @@ public class NetworkReceive implements Receive {
         this.buffer = null;
         this.maxSize = maxSize;
         this.memoryPool = MemoryPool.NONE;
+        PrintUitls.printToConsole("new a NetworkReceive, int maxSize, String source");
     }
 
     public NetworkReceive(int maxSize, String source, MemoryPool memoryPool) {
@@ -73,6 +77,7 @@ public class NetworkReceive implements Receive {
         this.buffer = null;
         this.maxSize = maxSize;
         this.memoryPool = memoryPool;
+        PrintUitls.printToConsole("new a NetworkReceive, int maxSize, String source, MemoryPool memoryPool");
     }
 
     public NetworkReceive() {
@@ -90,16 +95,27 @@ public class NetworkReceive implements Receive {
     }
 
     public long readFrom(ScatteringByteChannel channel) throws IOException {
+        PrintUitls.printToConsole("真正的读取数据了， 一字节一字节的读");
         int read = 0;
+        // position < limit => 返回true
         if (size.hasRemaining()) {
+            PrintUitls.printToConsole("如果有数据可读的话, 这里有点没有搞懂， 为什么， 这里不是死循环， 只读取一次， 就可以把数据全部读取出来吗？");
+            PrintUitls.printToConsole("将代表长度的字节给读取出来");
             int bytesRead = channel.read(size);
             if (bytesRead < 0)
+                // 如果读取到的数据小于0， 直接抛出一个异常
                 throw new EOFException();
             read += bytesRead;
+            PrintUitls.printToConsole("此时， 应该是读取完了因为一个int类型的数字为4个字节");
             if (!size.hasRemaining()) {
+                // 如果有超过4字节的数据， 那么重置一下ByteBuffer
+                PrintUitls.printToConsole("size给重置到0");
                 size.rewind();
+                // 看刚才读取了多少数据
                 int receiveSize = size.getInt();
+                PrintUitls.printToConsole("消息体的长度为"+receiveSize);
                 if (receiveSize < 0)
+                    // 如果刚才读取的小于0， 也是抛出异常
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + ")");
                 if (maxSize != UNLIMITED && receiveSize > maxSize)
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + " larger than " + maxSize + ")");
@@ -110,17 +126,20 @@ public class NetworkReceive implements Receive {
             }
         }
         if (buffer == null && requestedBufferSize != -1) { //we know the size we want but havent been able to allocate it yet
+            PrintUitls.printToConsole("申请一个buffer");
             buffer = memoryPool.tryAllocate(requestedBufferSize);
             if (buffer == null)
                 log.trace("Broker low on memory - could not allocate buffer of size {} for source {}", requestedBufferSize, source);
         }
         if (buffer != null) {
+            PrintUitls.printToConsole("如果前面读取一直不顺利， 那么还要再读取一次的");
             int bytesRead = channel.read(buffer);
             if (bytesRead < 0)
                 throw new EOFException();
             read += bytesRead;
         }
 
+        PrintUitls.printToConsole("这里就读了一个消息就不管了， 即使这里面还有那个消息");
         return read;
     }
 

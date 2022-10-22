@@ -22,6 +22,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.record.RecordBatch;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,7 @@ public class ProducerInterceptors<K, V> implements Closeable {
      * @return producer record to send to topic/partition
      */
     public ProducerRecord<K, V> onSend(ProducerRecord<K, V> record) {
+        PrintUitls.printToConsole("批量的去执行拦截器了, 拦截器的数量为" + interceptors.size());
         ProducerRecord<K, V> interceptRecord = record;
         for (ProducerInterceptor<K, V> interceptor : this.interceptors) {
             try {

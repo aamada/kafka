@@ -22,6 +22,7 @@ import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.requests.MetadataRequest;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 
@@ -66,6 +67,7 @@ public class ProducerMetadata extends Metadata {
 
     public synchronized void add(String topic, long nowMs) {
         Objects.requireNonNull(topic, "topic cannot be null");
+        PrintUitls.printToConsole("将topic = " + topic + ";放入到topics中去， 也放入到newTopics中去");
         if (topics.put(topic, nowMs + metadataIdleMs) == null) {
             newTopics.add(topic);
             requestUpdateForNewTopics();
@@ -128,6 +130,7 @@ public class ProducerMetadata extends Metadata {
         long deadlineMs = currentTimeMs + timeoutMs < 0 ? Long.MAX_VALUE : currentTimeMs + timeoutMs;
         // 这个线程就卡在这里了， 一直等待到有线程来通知它， 直到超过截止时间
         // 要不就是被通知到了， 要不就是超过截止时间了
+        PrintUitls.printToConsole("发送者在这里卡住了");
         time.waitObject(this, () -> {
             // Throw fatal exceptions, if there are any. Recoverable topic errors will be handled by the caller.
             maybeThrowFatalException();

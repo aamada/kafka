@@ -19,7 +19,7 @@ package org.apache.kafka.common.utils;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PrintUitls {
-    private static final String MSG = "=======> 【num】 time : 【time】;msg : 【【msg】】";
+    private static final String MSG = "=======> 【num】;time :\r\n 【time】;\r\nmsg : \r\n【【msg】】";
     private static final AtomicInteger NUM = new AtomicInteger(0);
     /**
      * DateTimeFormatter formatter=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

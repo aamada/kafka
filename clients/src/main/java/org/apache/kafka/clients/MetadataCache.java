@@ -24,6 +24,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.requests.MetadataResponse.PartitionMetadata;
+import org.apache.kafka.common.utils.PrintUitls;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
@@ -223,6 +224,7 @@ public class MetadataCache {
             nodes.put(nodeId, new Node(nodeId, address.getHostString(), address.getPort()));
             nodeId--;
         }
+        PrintUitls.printToConsole("新建一个MetadataCache对象");
         return new MetadataCache(null, nodes, Collections.emptyList(),
                 Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
                 null, Collections.emptyMap(), Cluster.bootstrap(addresses));

@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ThreadLog {
     private static final BlockingQueue<String> QUEUE = new ArrayBlockingQueue<String>(1000000);
-    private static final int WAINT_NUM = 2;
+    private static final int WAINT_NUM = 20;
     public static void putMsg(String msg) {
         try {
             QUEUE.put(msg);
