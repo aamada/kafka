@@ -31,6 +31,7 @@ import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.RecordVersion;
+import org.apache.kafka.common.utils.PrintUitls;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -78,6 +79,7 @@ public class ApiVersionsResponse extends AbstractResponse {
     }
 
     public static ApiVersionsResponse parse(ByteBuffer buffer, short version) {
+        PrintUitls.printToConsole("解析版本信息");
         // Fallback to version 0 for ApiVersions response. If a client sends an ApiVersionsRequest
         // using a version higher than that supported by the broker, a version 0 response is sent
         // to the client indicating UNSUPPORTED_VERSION. When the client receives the response, it

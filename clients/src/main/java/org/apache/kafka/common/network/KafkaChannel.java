@@ -33,6 +33,8 @@ import java.nio.channels.SocketChannel;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
+
 /**
  * A Kafka connection either existing on a client (which could be a broker in an
  * inter-broker scenario) and representing the channel to a remote broker or the
@@ -390,19 +392,19 @@ public class KafkaChannel implements AutoCloseable {
     public void setSend(NetworkSend send) {
         if (this.send != null)
             throw new IllegalStateException("Attempt to begin a send operation with prior send operation still in progress, connection id is " + id);
-        PrintUitls.printToConsole("给channel设置一个发送器， 并注册一个读事件");
+        printToConsole("给channel设置一个发送器， 并注册一个读事件, 传输层绑定一个读事件, 到这里， 发送数据还没有真正开始， 现在只是注册一个写事件， 等待着sender线程去处理写事件");
         this.send = send;
-        PrintUitls.printToConsole("传输层绑定一个读事件");
-        PrintUitls.printToConsole("到这里， 发送数据还没有真正开始， 现在只是注册一个写事件， 等待着sender线程去处理写事件");
         this.transportLayer.addInterestOps(SelectionKey.OP_WRITE);
     }
 
     public NetworkSend maybeCompleteSend() {
         if (send != null && send.completed()) {
             midWrite = false;
+            printToConsole("移除掉write事件");
             transportLayer.removeInterestOps(SelectionKey.OP_WRITE);
             NetworkSend result = send;
             send = null;
+            printToConsole("将channel里的send给置为了null");
             return result;
         }
         return null;
@@ -410,7 +412,7 @@ public class KafkaChannel implements AutoCloseable {
 
     public long read() throws IOException {
         if (receive == null) {
-            PrintUitls.printToConsole("如果没有一个接收数据的对象的话， 新建一个Receive, 这个receive居然是一个成员变量， 那么是不是就是说， 它是共享的？");
+            printToConsole("如果没有一个接收数据的对象的话， 新建一个Receive, 这个receive居然是一个成员变量， 那么是不是就是说， 它是共享的？");
             receive = new NetworkReceive(maxReceiveSize, id, memoryPool);
         }
 
@@ -428,15 +430,15 @@ public class KafkaChannel implements AutoCloseable {
     }
 
     public NetworkReceive maybeCompleteReceive() {
-        PrintUitls.printToConsole("走去看看， 有没有读完消息");
+        printToConsole("走去看看， 有没有读完消息");
         if (receive != null && receive.complete()) {
-            PrintUitls.printToConsole("这个receive读完了， 说明这个消息， 不是拆包的， 没有剩余的消息在channel里， 其实这也不正确。");
+            printToConsole("这个receive读完了， 说明这个消息， 不是拆包的， 没有剩余的消息在channel里， 其实这也不正确。");
             receive.payload().rewind();
             NetworkReceive result = receive;
             receive = null;
             return result;
         }
-        PrintUitls.printToConsole("这个receive没有读完， 这个消息， 还不全， 它还有一些消息体还没有到");
+        printToConsole("这个receive没有读完， 这个消息， 还不全， 它还有一些消息体还没有到");
         return null;
     }
 
@@ -445,6 +447,7 @@ public class KafkaChannel implements AutoCloseable {
             return 0;
 
         midWrite = true;
+        printToConsole("channel里有send， 也有transportLayer传输层， 真的神奇");
         return send.writeTo(transportLayer);
     }
 
@@ -467,7 +470,7 @@ public class KafkaChannel implements AutoCloseable {
 
     private long receive(NetworkReceive receive) throws IOException {
         try {
-            PrintUitls.printToConsole("使用上面新建的receive去transportLayer去读取数据");
+            printToConsole("使用上面新建的receive去transportLayer去读取数据");
             return receive.readFrom(transportLayer);
         } catch (SslAuthenticationException e) {
             // With TLSv1.3, post-handshake messages may throw SSLExceptions, which are

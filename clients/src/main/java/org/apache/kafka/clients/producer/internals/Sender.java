@@ -185,7 +185,6 @@ public class Sender implements Runnable {
      *  Get the in-flight batches that has reached delivery timeout.
      */
     private List<ProducerBatch> getExpiredInflightBatches(long now) {
-        printToConsole("拿过期的batches");
         List<ProducerBatch> expiredBatches = new ArrayList<>();
 
         for (Iterator<Map.Entry<TopicPartition, List<ProducerBatch>>> batchIt = inFlightBatches.entrySet().iterator(); batchIt.hasNext();) {
@@ -306,6 +305,7 @@ public class Sender implements Runnable {
      *
      */
     void runOnce() {
+        printToConsole("=======================> sender run onece");
         if (transactionManager != null) {
             try {
                 transactionManager.maybeResolveSequences();
@@ -747,6 +747,7 @@ public class Sender implements Runnable {
      * Transfer the record batches into a list of produce requests on a per-node basis
      */
     private void sendProduceRequests(Map<Integer, List<ProducerBatch>> collated, long now) {
+        printToConsole("List<ProducerBatch>>会是空的吗？size="+collated.size());
         for (Map.Entry<Integer, List<ProducerBatch>> entry : collated.entrySet())
             sendProduceRequest(now, entry.getKey(), acks, requestTimeoutMs, entry.getValue());
     }

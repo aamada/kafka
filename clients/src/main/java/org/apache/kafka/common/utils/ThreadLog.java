@@ -22,13 +22,14 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ThreadLog {
-    private static final BlockingQueue<String> QUEUE = new ArrayBlockingQueue<String>(1000000);
-    private static final int WAINT_NUM = 20;
-    public static void putMsg(String msg) {
+    private static final BlockingQueue<String> QUEUE = new LinkedBlockingQueue<>(1000000);
+    private static final int WAINT_NUM = 40;
+    public synchronized static void putMsg(String msg) {
         try {
             QUEUE.put(msg);
         } catch (InterruptedException e) {
@@ -78,6 +79,6 @@ public class ThreadLog {
             }
         });
         t.setName("cjm-log-thread");
-        t.start();
+//        t.start();
     }
 }

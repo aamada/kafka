@@ -22,6 +22,7 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.common.security.auth.KafkaPrincipalBuilder;
 import org.apache.kafka.common.security.auth.KafkaPrincipalSerde;
 import org.apache.kafka.common.security.auth.PlaintextAuthenticationContext;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,8 @@ import java.nio.channels.SelectionKey;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
+
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 public class PlaintextChannelBuilder implements ChannelBuilder {
     private static final Logger log = LoggerFactory.getLogger(PlaintextChannelBuilder.class);
@@ -55,6 +58,7 @@ public class PlaintextChannelBuilder implements ChannelBuilder {
     public KafkaChannel buildChannel(String id, SelectionKey key, int maxReceiveSize,
                                      MemoryPool memoryPool, ChannelMetadataRegistry metadataRegistry) throws KafkaException {
         try {
+            printToConsole("构建KafkaChannel");
             PlaintextTransportLayer transportLayer = buildTransportLayer(key);
             Supplier<Authenticator> authenticatorCreator = () -> new PlaintextAuthenticator(configs, transportLayer, listenerName);
             return buildChannel(id, transportLayer, authenticatorCreator, maxReceiveSize,
@@ -68,10 +72,12 @@ public class PlaintextChannelBuilder implements ChannelBuilder {
     // visible for testing
     KafkaChannel buildChannel(String id, TransportLayer transportLayer, Supplier<Authenticator> authenticatorCreator,
                               int maxReceiveSize, MemoryPool memoryPool, ChannelMetadataRegistry metadataRegistry) {
+        printToConsole("new KafkaChannel");
         return new KafkaChannel(id, transportLayer, authenticatorCreator, maxReceiveSize, memoryPool, metadataRegistry);
     }
 
     protected PlaintextTransportLayer buildTransportLayer(SelectionKey key) throws IOException {
+        printToConsole("新建一个PlaintextTransportLayer, key=" + key.toString());
         return new PlaintextTransportLayer(key);
     }
 

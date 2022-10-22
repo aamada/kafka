@@ -19,6 +19,7 @@ package org.apache.kafka.clients.producer.internals;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.record.RecordBatch;
+import org.apache.kafka.common.utils.PrintUitls;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -64,6 +65,7 @@ public class ProduceRequestResult {
      * Mark this request as complete and unblock any threads waiting on its completion.
      */
     public void done() {
+        PrintUitls.printToConsole("done");
         if (baseOffset == null)
             throw new IllegalStateException("The method `set` must be invoked before this method.");
         this.latch.countDown();

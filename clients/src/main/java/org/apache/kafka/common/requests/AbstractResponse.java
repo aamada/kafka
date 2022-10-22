@@ -21,6 +21,7 @@ import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.MessageUtil;
 import org.apache.kafka.common.protocol.SendBuilder;
+import org.apache.kafka.common.utils.PrintUitls;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -96,6 +97,7 @@ public abstract class AbstractResponse implements AbstractRequestResponse {
     public static AbstractResponse parseResponse(ByteBuffer buffer, RequestHeader requestHeader) {
         ApiKeys apiKey = requestHeader.apiKey();
         short apiVersion = requestHeader.apiVersion();
+        PrintUitls.printToConsole("解析response, apiKey = " + apiKey + ";apiVersion = " + apiVersion);
 
         ResponseHeader responseHeader = ResponseHeader.parse(buffer, apiKey.responseHeaderVersion(apiVersion));
 

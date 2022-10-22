@@ -17,6 +17,7 @@
 package org.apache.kafka.clients.producer.internals;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
 
 import java.util.concurrent.ExecutionException;
@@ -62,6 +63,7 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
     @Override
     public RecordMetadata get() throws InterruptedException, ExecutionException {
         this.result.await();
+        PrintUitls.printToConsole("RecordMetadata#get");
         if (nextRecordMetadata != null)
             return nextRecordMetadata.get();
         return valueOrError();

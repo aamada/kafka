@@ -250,6 +250,7 @@ public class Selector implements Selectable, AutoCloseable {
      */
     @Override
     public void connect(String id, InetSocketAddress address, int sendBufferSize, int receiveBufferSize) throws IOException {
+        printToConsole("打开socketChannel， 配置channel， 注册channel, 连接");
         ensureNotRegistered(id);
         SocketChannel socketChannel = SocketChannel.open();
         SelectionKey key = null;
@@ -277,6 +278,7 @@ public class Selector implements Selectable, AutoCloseable {
     // in order to simulate "immediately connected" sockets.
     protected boolean doConnect(SocketChannel channel, InetSocketAddress address) throws IOException {
         try {
+            printToConsole("连接doConnect");
             return channel.connect(address);
         } catch (UnresolvedAddressException e) {
             throw new IOException("Can't resolve address: " + address, e);
@@ -328,6 +330,7 @@ public class Selector implements Selectable, AutoCloseable {
     }
 
     protected SelectionKey registerChannel(String id, SocketChannel socketChannel, int interestedOps) throws IOException {
+        printToConsole("id="+id+";socketchannel="+socketChannel.toString()+";interestedOps="+interestedOps);
         SelectionKey key = socketChannel.register(nioSelector, interestedOps);
         KafkaChannel channel = buildAndAttachKafkaChannel(socketChannel, id, key);
         this.channels.put(id, channel);
@@ -340,6 +343,7 @@ public class Selector implements Selectable, AutoCloseable {
         try {
             KafkaChannel channel = channelBuilder.buildChannel(id, key, maxReceiveSize, memoryPool,
                 new SelectorChannelMetadataRegistry());
+            printToConsole("把channel放入到key中去");
             key.attach(channel);
             return channel;
         } catch (Exception e) {
@@ -473,10 +477,8 @@ public class Selector implements Selectable, AutoCloseable {
         this.sensors.selectTime.record(endSelect - startSelect, time.milliseconds());
 
         if (numReadyKeys > 0 || !immediatelyConnectedKeys.isEmpty() || dataInBuffers) {
-            printToConsole("如果有事件的话， 那么把事件key给拿出来");
             Set<SelectionKey> readyKeys = this.nioSelector.selectedKeys();
-
-            // todo 下面为什么会有三个调用处理key的方法
+            printToConsole("如果有事件的话， 那么把事件key给拿出来, readyKeys="+readyKeys.size());
             // Poll from channels that have buffered data (but nothing more from the underlying socket)
             if (dataInBuffers) {
                 printToConsole("dataInBuffers=true");
@@ -518,8 +520,9 @@ public class Selector implements Selectable, AutoCloseable {
     void pollSelectionKeys(Set<SelectionKey> selectionKeys,
                            boolean isImmediatelyConnected,
                            long currentTimeNanos) {
-        printToConsole("key size = " + selectionKeys.size()+ "isImmediatelyConnected = " + isImmediatelyConnected + ";currentTimeNanos = " + currentTimeNanos);
+        printToConsole("key size = " + selectionKeys.size()+ ";isImmediatelyConnected = " + isImmediatelyConnected + ";currentTimeNanos = " + currentTimeNanos);
         for (SelectionKey key : determineHandlingOrder(selectionKeys)) {
+            printToConsole("key is accept able = " + key.isAcceptable()  + ";key connected = " + key.isConnectable() + ";key read able = " + key.isReadable() + ";key write able = " + key.isWritable());
             KafkaChannel channel = channel(key);
             long channelStartTimeNanos = recordTimePerConnection ? time.nanoseconds() : 0;
             boolean sendFailed = false;
@@ -536,6 +539,7 @@ public class Selector implements Selectable, AutoCloseable {
                 if (isImmediatelyConnected || key.isConnectable()) {
                     // 如果已经连接成功
                     if (channel.finishConnect()) {
+                        printToConsole("连接创建成功, 刚才连接的节点， 给放入到connected中去");
                         this.connected.add(nodeId);
                         this.sensors.connectionCreated.record();
 
@@ -587,7 +591,7 @@ public class Selector implements Selectable, AutoCloseable {
                 //previous completed receive then read from it
                 if (channel.ready() && (key.isReadable() || channel.hasBytesBuffered()) && !hasCompletedReceive(channel)
                         && !explicitlyMutedChannels.contains(channel)) {
-                    // 读
+                    printToConsole("读事件");
                     attemptRead(channel);
                 }
 
@@ -607,7 +611,7 @@ public class Selector implements Selectable, AutoCloseable {
 
                 long nowNanos = channelStartTimeNanos != 0 ? channelStartTimeNanos : currentTimeNanos;
                 try {
-                    // 写
+                    printToConsole("写事件");
                     attemptWrite(key, channel, nowNanos);
                 } catch (Exception e) {
                     sendFailed = true;
@@ -652,7 +656,6 @@ public class Selector implements Selectable, AutoCloseable {
                 && channel.ready()
                 && key.isWritable()
                 && !channel.maybeBeginClientReauthentication(() -> nowNanos)) {
-            printToConsole("有数据可写");
             write(channel);
         }
     }
@@ -664,6 +667,7 @@ public class Selector implements Selectable, AutoCloseable {
         NetworkSend send = channel.maybeCompleteSend();
         // We may complete the send with bytesSent < 1 if `TransportLayer.hasPendingWrites` was true and `channel.write()`
         // caused the pending writes to be written to the socket channel buffer
+        printToConsole("这里会使用channel去写数据， channel里有send， 有transportLayer, bytesend = "+send);
         if (bytesSent > 0 || send != null) {
             long currentTimeMs = time.milliseconds();
             if (bytesSent > 0)
@@ -1001,6 +1005,7 @@ public class Selector implements Selectable, AutoCloseable {
     }
 
     private KafkaChannel openOrClosingChannelOrFail(String id) {
+        printToConsole("去channels里找到一个id="+id +"的channedl");
         KafkaChannel channel = this.channels.get(id);
         if (channel == null)
             channel = this.closingChannels.get(id);

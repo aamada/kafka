@@ -21,13 +21,15 @@ import org.apache.kafka.common.utils.PrintUitls;
 
 import java.io.IOException;
 
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
+
 public class NetworkSend implements Send {
     private final String destinationId;
     private final Send send;
 
     public NetworkSend(String destinationId, Send send) {
         this.destinationId = destinationId;
-        PrintUitls.printToConsole("创建NetworkSend， send = " + send.toString());
+        printToConsole("创建NetworkSend， send = " + send.toString());
         this.send = send;
     }
 
@@ -42,6 +44,7 @@ public class NetworkSend implements Send {
 
     @Override
     public long writeTo(TransferableChannel channel) throws IOException {
+        printToConsole("写事件来了, send = " + send.toString());
         return send.writeTo(channel);
     }
 

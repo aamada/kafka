@@ -65,6 +65,8 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
+
 /**
  * A network client for asynchronous request/response network i/o. This is an internal class used to implement the
  * user-facing producer and consumer clients.
@@ -464,17 +466,18 @@ public class NetworkClient implements KafkaClient {
      */
     @Override
     public void send(ClientRequest request, long now) {
+        printToConsole("reqeust, now");
         doSend(request, false, now);
     }
 
     // package-private for testing
     void sendInternalMetadataRequest(MetadataRequest.Builder builder, String nodeConnectionId, long now) {
         ClientRequest clientRequest = newClientRequest(nodeConnectionId, builder, now, true);
+        printToConsole("MetadataRequest.Builder builder, String nodeConnectionId, long now");
         doSend(clientRequest, true, now);
     }
 
     private void doSend(ClientRequest clientRequest, boolean isInternalRequest, long now) {
-        // todo 到这里了
         ensureActive();
         String nodeId = clientRequest.destination();
         if (!isInternalRequest) {
@@ -523,15 +526,16 @@ public class NetworkClient implements KafkaClient {
     }
 
     private void doSend(ClientRequest clientRequest, boolean isInternalRequest, long now, AbstractRequest request) {
+        printToConsole("clientRequest = " + clientRequest.toString() + ";isInternalRequest="+isInternalRequest + ";now="+now);
         String destination = clientRequest.destination();
         RequestHeader header = clientRequest.makeHeader(request.version());
         if (log.isDebugEnabled()) {
             log.debug("Sending {} request with header {} and timeout {} to node {}: {}",
                 clientRequest.apiKey(), header, clientRequest.requestTimeoutMs(), destination, request);
         }
-        PrintUitls.printToConsole("新建一个send");
+        printToConsole("新建一个send");
         Send send = request.toSend(header);
-        PrintUitls.printToConsole("新建一个InFlightRequest");
+        printToConsole("新建一个InFlightRequest");
         InFlightRequest inFlightRequest = new InFlightRequest(
                 clientRequest,
                 header,
@@ -539,7 +543,7 @@ public class NetworkClient implements KafkaClient {
                 request,
                 send,
                 now);
-        PrintUitls.printToConsole("把刚才建立的inFlightRequest, 放入至inFlightRequests中去");
+        printToConsole("把刚才建立的inFlightRequest, 放入至inFlightRequests中去");
         this.inFlightRequests.add(inFlightRequest);
         selector.send(new NetworkSend(clientRequest.destination(), send));
     }
@@ -575,7 +579,6 @@ public class NetworkClient implements KafkaClient {
              * 等后面来看这里的详细信息
              *
              * 这里还是挺难的
-             * todo 这里还是不知道怎么去发送的
              */
             this.selector.poll(Utils.min(timeout, metadataTimeout, defaultRequestTimeoutMs));
         } catch (IOException e) {
@@ -599,6 +602,7 @@ public class NetworkClient implements KafkaClient {
     }
 
     private void completeResponses(List<ClientResponse> responses) {
+        printToConsole("刚才放入到resposnes里的， 一个一个的response到这里来需要执行一些回调函数, response size = " + responses.size());
         for (ClientResponse response : responses) {
             try {
                 response.onComplete();
@@ -856,8 +860,10 @@ public class NetworkClient implements KafkaClient {
         // if no response is expected then when the send is completed, return it
         for (NetworkSend send : this.selector.completedSends()) {
             InFlightRequest request = this.inFlightRequests.lastSent(send.destinationId());
+            printToConsole("处理完成发送的事件， send = "+send+";request = "+request+";expectResponse = " + request.expectResponse);
             if (!request.expectResponse) {
                 this.inFlightRequests.completeLastSent(send.destinationId());
+                printToConsole("将一个response放入到responses中去");
                 responses.add(request.completed(null, now));
             }
         }
@@ -891,6 +897,7 @@ public class NetworkClient implements KafkaClient {
 //        PrintUitls.printToConsole("这里来处理理， 之前从channel里读取到的, 并放入至completedReceives数据");
         for (NetworkReceive receive : this.selector.completedReceives()) {
             // 收到的消息
+            printToConsole("处理完成接收事件, receive = " + receive);
             String source = receive.source();
             InFlightRequest req = inFlightRequests.completeNext(source);
 
@@ -912,12 +919,14 @@ public class NetworkClient implements KafkaClient {
             else if (req.isInternalRequest && response instanceof ApiVersionsResponse)
                 handleApiVersionsResponse(responses, req, now, (ApiVersionsResponse) response);
             else
+                printToConsole("往responses中加入这个新的response, 这是非元数据更新， 非版本号更新的返回值");
                 responses.add(req.completed(response, now));
         }
     }
 
     private void handleApiVersionsResponse(List<ClientResponse> responses,
                                            InFlightRequest req, long now, ApiVersionsResponse apiVersionsResponse) {
+        printToConsole("处理版本更新");
         final String node = req.destination;
         if (apiVersionsResponse.data().errorCode() != Errors.NONE.code()) {
             if (req.request.version() == 0 || apiVersionsResponse.data().errorCode() != Errors.UNSUPPORTED_VERSION.code()) {
@@ -991,6 +1000,7 @@ public class NetworkClient implements KafkaClient {
                 log.debug("Initiating API versions fetch from node {}.", node);
                 ApiVersionsRequest.Builder apiVersionRequestBuilder = entry.getValue();
                 ClientRequest clientRequest = newClientRequest(node, apiVersionRequestBuilder, now, true);
+                printToConsole("handleInitiateApiVersionRequests");
                 doSend(clientRequest, true, now);
                 iter.remove();
             }
@@ -1003,6 +1013,7 @@ public class NetworkClient implements KafkaClient {
      * @param now current time in epoch milliseconds
      */
     private void initiateConnect(Node node, long now) {
+        printToConsole("initiateConnect, node = "+node.toString());
         String nodeConnectionId = node.idString();
         try {
             connectionStates.connecting(nodeConnectionId, now, node.host(), clientDnsLookup);
@@ -1110,6 +1121,7 @@ public class NetworkClient implements KafkaClient {
 
         @Override
         public void handleSuccessfulResponse(RequestHeader requestHeader, long now, MetadataResponse response) {
+            printToConsole("处理元数据更新");
             // If any partition has leader with missing listeners, log up to ten of these partitions
             // for diagnosing broker configuration issues.
             // This could be a transient issue if listeners were added dynamically to brokers.

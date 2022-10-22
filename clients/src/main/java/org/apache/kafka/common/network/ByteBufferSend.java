@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.common.network;
 
+import org.apache.kafka.common.utils.PrintUitls;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -45,6 +47,7 @@ public class ByteBufferSend implements Send {
 
     @Override
     public boolean completed() {
+        PrintUitls.printToConsole("remaing = " + remaining +";pending = " + pending);
         return remaining <= 0 && !pending;
     }
 

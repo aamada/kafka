@@ -16,25 +16,59 @@
  */
 package org.apache.kafka.common.utils;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PrintUitls {
-    private static final String MSG = "=======> 【num】;time :\r\n 【time】;\r\nmsg : \r\n【【msg】】";
+    static {
+        File file = new File("D:\\kafka.1.log");
+        if (file.exists()) {
+            file.delete();
+            try {
+                file.createNewFile();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+    private static final String MSG = "=======> 【num】;time : 【time】;\r\nmsg : \r\n 【【msg】】";
     private static final AtomicInteger NUM = new AtomicInteger(0);
+    private static File FILE = new File("D:\\kafka.1.log");
     /**
      * DateTimeFormatter formatter=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
      */
-    public static void printToConsole(String msg) {
+    public synchronized static void printToConsole(String msg) {
         int times = NUM.getAndIncrement();
         String threadAndUserMsg = getMsg(msg);
         String m = MSG.replace("【time】", getTime());
         m = m.replace("【msg】", threadAndUserMsg);
         m = m.replace("【num】", String.valueOf(times));
-        ThreadLog.putMsg(m);
+//        printConsoleFile(m);
+        System.err.println(m);
+    }
+
+    private static void printConsoleFile(String m) {
+
+        byte[] bytes;
+        try {
+            bytes = ("\r\n" + m).getBytes(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        try (BufferedOutputStream outputStream = new BufferedOutputStream(new FileOutputStream(FILE, true))) {
+            outputStream.write(bytes);
+            outputStream.flush();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String getMsg(String msg) {
-        return getThreadInfo() + ";user msg = 【" + msg + "】";
+        return getThreadInfo() + "; \r\nuser msg = 【" + msg + "】";
     }
 
     private static String getTime() {
@@ -44,9 +78,10 @@ public class PrintUitls {
     public static String getThreadInfo() {
         Thread thread = Thread.currentThread();
         String name = thread.getName();
+        long id = thread.getId();
         StackTraceElement[] stackTrace = thread.getStackTrace();
         StackTraceElement stackTraceElement = stackTrace[4];
-        return "thread name = " + name + ";location=【" +
+        return "thread name = " + name + ";id = "+id+";location=【" +
                 stackTraceElement.getClassName() + "#" + stackTraceElement.getMethodName() +
                 ";lineNumber=" + stackTraceElement.getLineNumber() + "】";
     }

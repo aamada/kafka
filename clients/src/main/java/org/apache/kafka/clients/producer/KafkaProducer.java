@@ -1090,7 +1090,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private ClusterAndWaitTime waitOnMetadata(String topic, Integer partition, long nowMs, long maxWaitMs) throws InterruptedException {
         // add topic to metadata topic list if it is not there already and reset expiry
         // 拿到主题的分区信息
-        printToConsole("等待元数据， topic=" + topic + ";partition=" + partition + ";nowMs = " + nowMs + ":maxWaitMs = " + maxWaitMs);
+        printToConsole("waitOnMetadata， topic=" + topic + ";partition=" + partition + ";nowMs = " + nowMs + ":maxWaitMs = " + maxWaitMs);
         Cluster cluster = metadata.fetch();
 
         // 集群里的这个主题

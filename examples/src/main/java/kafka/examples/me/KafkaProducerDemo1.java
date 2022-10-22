@@ -18,10 +18,14 @@ package kafka.examples.me;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.utils.PrintUitls;
 
 import java.util.Properties;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 /**
  * ;broker, producer, consumer
@@ -49,8 +53,10 @@ public class KafkaProducerDemo1 {
         ProducerRecord<String, String> record =
             new ProducerRecord<>(Constant.TOPIC, "hello, Kafka!");
         try {
-            PrintUitls.printToConsole("用户了一条消息去了");
-            producer.send(record);
+            printToConsole("用户了一条消息去了");
+            Future<RecordMetadata> send = producer.send(record);
+            printToConsole("等待第一次发送的结果");
+            send.get();
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -60,8 +66,10 @@ public class KafkaProducerDemo1 {
             throw new RuntimeException(e);
         }
         try {
-            PrintUitls.printToConsole("用户了再发了一条消息去了");
-            producer.send(record);
+            printToConsole("用户了再发了一条消息去了");
+            Future<RecordMetadata> ose = producer.send(record);
+            printToConsole("等待第2次发送的结果");
+            ose.get();
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
