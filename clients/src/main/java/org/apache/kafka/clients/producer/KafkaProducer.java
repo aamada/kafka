@@ -602,6 +602,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private static short configureAcks(ProducerConfig config, Logger log) {
         boolean userConfiguredAcks = config.originals().containsKey(ProducerConfig.ACKS_CONFIG);
         short acks = Short.parseShort(config.getString(ProducerConfig.ACKS_CONFIG));
+        printToConsole("acks = " + acks);
 
         if (config.idempotenceEnabled()) {
             if (!userConfiguredAcks)

@@ -17,6 +17,7 @@
 package org.apache.kafka.clients.producer.internals;
 
 import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.ProducerIdAndEpoch;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.kafka.common.record.RecordBatch.MAGIC_VALUE_V2;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 /**
  * A batch of records that is or will be sent.
@@ -186,6 +188,7 @@ public final class ProducerBatch {
      * @return true if the batch was completed successfully and false if the batch was previously aborted
      */
     public boolean done(long baseOffset, long logAppendTime, RuntimeException exception) {
+        printToConsole("ProducerBatch done");
         final FinalState tryFinalState = (exception == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
 
         if (tryFinalState == FinalState.SUCCEEDED) {
@@ -217,6 +220,7 @@ public final class ProducerBatch {
     }
 
     private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, RuntimeException exception) {
+        printToConsole("completeFutureAndFireCallbacks");
         // Set the future before invoking the callbacks as we rely on its state for the `onCompletion` call
         produceFuture.set(baseOffset, logAppendTime, exception);
 

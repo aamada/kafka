@@ -21,7 +21,9 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.utils.PrintUitls;
 
+import java.io.InputStream;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -52,6 +54,52 @@ public class KafkaProducerDemo1 {
             new KafkaProducer<>(properties);
         ProducerRecord<String, String> record =
             new ProducerRecord<>(Constant.TOPIC, "hello, Kafka!");
+        boolean flag = true;
+        int times = 0;
+        while (flag) {
+            times++;
+            ProducerRecord<String, String> mms =
+                    new ProducerRecord<>(Constant.TOPIC, "hello, Kafka!" + System.currentTimeMillis());
+            producer.send(mms);
+            if (times > 1000000) {
+                flag = false;
+            }
+        }
+        printToConsole("结束了");
+        producer.close();
+    }
+
+    /**
+     * 输入时， 发送消息
+     *
+     * @param producer 发送者
+     */
+    private static void newConsole(KafkaProducer<String, String> producer) {
+        Scanner scanner = new Scanner(System.in);
+        while (scanner.hasNext()) {
+            String command = scanner.nextLine();
+            if ("end".equals(command)) {
+                break;
+            }
+            ProducerRecord<String, String> msg = new ProducerRecord<>(Constant.TOPIC, command);
+            producer.send(msg, (RecordMetadata metadata, Exception exception) -> {
+                if (exception != null) {
+                    printToConsole("回调函数有异常， -> msg = " + exception.getMessage());
+                } else {
+                    printToConsole("回调函数来了, metadata = " + metadata);
+                }
+            });
+        }
+        System.err.println("end kafka send msg");
+    }
+
+    /**
+     * 只发送一条消息
+     *
+     * @param producer 发送者
+     * @param record 消息
+     */
+    private static void singMsg(KafkaProducer<String, String> producer, ProducerRecord<String, String> record) {
         try {
             printToConsole("用户了一条消息去了");
             Future<RecordMetadata> send = producer.send(record);
@@ -73,6 +121,5 @@ public class KafkaProducerDemo1 {
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
-        producer.close();
     }
 }

@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.ApiVersions;
 import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.common.utils.ProducerIdAndEpoch;
+import org.apache.kafka.common.utils.*;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
@@ -51,10 +51,9 @@ import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.TimestampType;
-import org.apache.kafka.common.utils.CopyOnWriteMap;
-import org.apache.kafka.common.utils.LogContext;
-import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
+
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 /**
  * This class acts as a queue that accumulates records into {@link MemoryRecords}
@@ -308,6 +307,7 @@ public final class RecordAccumulator {
      * Get a list of batches which have been sitting in the accumulator too long and need to be expired.
      */
     public List<ProducerBatch> expiredBatches(long now) {
+        printToConsole("expiredBatches");
         List<ProducerBatch> expiredBatches = new ArrayList<>();
         for (Map.Entry<TopicPartition, Deque<ProducerBatch>> entry : this.batches.entrySet()) {
             // expire the batches in the order of sending
@@ -315,6 +315,7 @@ public final class RecordAccumulator {
             synchronized (deque) {
                 while (!deque.isEmpty()) {
                     ProducerBatch batch = deque.getFirst();
+                    printToConsole("sendProducerData中调用的此方法");
                     if (batch.hasReachedDeliveryTimeout(deliveryTimeoutMs, now)) {
                         deque.poll();
                         batch.abortRecordAppends();

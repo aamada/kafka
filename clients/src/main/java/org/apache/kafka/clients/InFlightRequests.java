@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.clients;
 
+import org.apache.kafka.common.utils.PrintUitls;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -157,6 +159,7 @@ final class InFlightRequests {
     }
 
     private Boolean hasExpiredRequest(long now, Deque<NetworkClient.InFlightRequest> deque) {
+        // 只能说， 之前的这里是挺多东西的， 现在只有这么少的一个判断， 真的是可以看这个发展的流程是什么样的。
         for (NetworkClient.InFlightRequest request : deque) {
             long timeSinceSend = Math.max(0, now - request.sendTimeMs);
             if (timeSinceSend > request.requestTimeoutMs)
@@ -173,6 +176,7 @@ final class InFlightRequests {
      */
     public List<String> nodesWithTimedOutRequests(long now) {
         List<String> nodeIds = new ArrayList<>();
+        PrintUitls.printToConsole("遍历每一次的请求， 看它们是否超时");
         for (Map.Entry<String, Deque<NetworkClient.InFlightRequest>> requestEntry : requests.entrySet()) {
             String nodeId = requestEntry.getKey();
             Deque<NetworkClient.InFlightRequest> deque = requestEntry.getValue();

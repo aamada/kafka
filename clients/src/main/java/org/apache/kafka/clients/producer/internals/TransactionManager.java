@@ -29,6 +29,7 @@ import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.UnknownProducerIdException;
 import org.apache.kafka.common.message.ApiVersionsResponseData.ApiVersion;
 import org.apache.kafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.ProducerIdAndEpoch;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Node;
@@ -725,6 +726,7 @@ public class TransactionManager {
     }
 
     synchronized void handleFailedBatch(ProducerBatch batch, RuntimeException exception, boolean adjustSequenceNumbers) {
+        PrintUitls.printToConsole("handleFailedBatch");
         maybeTransitionToErrorState(exception);
         removeInFlightBatch(batch);
 

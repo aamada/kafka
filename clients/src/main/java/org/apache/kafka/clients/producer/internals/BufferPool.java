@@ -29,7 +29,10 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Meter;
+import org.apache.kafka.common.utils.PrintUitls;
 import org.apache.kafka.common.utils.Time;
+
+import static org.apache.kafka.common.utils.PrintUitls.printToConsole;
 
 
 /**
@@ -323,6 +326,7 @@ public class BufferPool {
     public void deallocate(ByteBuffer buffer, int size) {
         lock.lock();
         try {
+            printToConsole("有线程来返还内存了");
             if (size == this.poolableSize && size == buffer.capacity()) {
                 buffer.clear();
                 this.free.add(buffer);

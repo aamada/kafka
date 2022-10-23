@@ -602,9 +602,10 @@ public class NetworkClient implements KafkaClient {
     }
 
     private void completeResponses(List<ClientResponse> responses) {
-        printToConsole("刚才放入到resposnes里的， 一个一个的response到这里来需要执行一些回调函数, response size = " + responses.size());
+        //printToConsole("刚才放入到resposnes里的， 一个一个的response到这里来需要执行一些回调函数, response size = " + responses.size());
         for (ClientResponse response : responses) {
             try {
+                printToConsole("有返回的response啊， 处理一下");
                 response.onComplete();
             } catch (Exception e) {
                 log.error("Uncaught error in request completion:", e);
@@ -840,6 +841,7 @@ public class NetworkClient implements KafkaClient {
     private void handleTimedOutConnections(List<ClientResponse> responses, long now) {
         List<String> nodes = connectionStates.nodesWithConnectionSetupTimeout(now);
         for (String nodeId : nodes) {
+            printToConsole("连接主机超时的处理");
             this.selector.close(nodeId);
             log.debug(
                 "Disconnecting from node {} due to socket connection setup timeout. " +
@@ -1307,6 +1309,7 @@ public class NetworkClient implements KafkaClient {
             this.isInternalRequest = isInternalRequest;
             this.request = request;
             this.send = send;
+            // 发送的时间， 用于判断， 是 否超时
             this.sendTimeMs = sendTimeMs;
         }
 
