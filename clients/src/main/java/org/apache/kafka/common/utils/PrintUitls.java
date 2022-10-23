@@ -47,8 +47,8 @@ public class PrintUitls {
         String m = MSG.replace("【time】", getTime());
         m = m.replace("【msg】", threadAndUserMsg);
         m = m.replace("【num】", String.valueOf(times));
-//        printConsoleFile(m);
-        System.err.println(m);
+        printConsoleFile(m);
+//        System.err.println(m);
     }
 
     private static void printConsoleFile(String m) {
