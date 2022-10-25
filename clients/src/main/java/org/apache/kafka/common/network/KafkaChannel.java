@@ -82,6 +82,7 @@ public class KafkaChannel {
     }
 
     public void mute() {
+        // 移除掉读事件， 为什么呢？
         transportLayer.removeInterestOps(SelectionKey.OP_READ);
     }
 

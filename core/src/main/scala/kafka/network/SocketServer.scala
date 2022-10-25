@@ -81,22 +81,41 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
 
       connectionQuotas = new ConnectionQuotas(maxConnectionsPerIp, maxConnectionsPerIpOverrides)
 
+      // 发送与请求时， 一些大小
       val sendBufferSize = config.socketSendBufferBytes
       val recvBufferSize = config.socketReceiveBufferBytes
+      // 当前broker的id
       val brokerId = config.brokerId
 
       var processorBeginIndex = 0
+
+      /**
+       * 配置kafka的时候
+       * config/server.properties文件里面有一个参数， 主机:端口号  当我们配置好后， 客户端可以使用这个信息来连接
+       * 其实也就是说， 这里会有多个acceptor
+       */
       endpoints.values.foreach { endpoint =>
         val protocol = endpoint.protocolType
         val processorEndIndex = processorBeginIndex + numProcessorThreads
 
+        // 这里会创建三个线程
+        // 这个值是可以配置的
         for (i <- processorBeginIndex until processorEndIndex)
           processors(i) = newProcessor(i, connectionQuotas, protocol)
 
+        // 接收器
+        // 它里面持有了这个processors
         val acceptor = new Acceptor(endpoint, sendBufferSize, recvBufferSize, brokerId,
           processors.slice(processorBeginIndex, processorEndIndex), connectionQuotas)
         acceptors.put(endpoint, acceptor)
+
+        /**
+         * 这个方法是用来帮助我们启动线程使用的
+         *  我们阅读代码的时候， 如果一个线程被执行了start方法， 那么我们接下来， 就是去看
+         *  它的run方法
+         */
         Utils.newThread("kafka-socket-acceptor-%s-%d".format(protocol.toString, endpoint.port), acceptor, false).start()
+        // 等待process启动成功
         acceptor.awaitStartup()
 
         processorBeginIndex = processorEndIndex
@@ -238,10 +257,12 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                               processors: Array[Processor],
                               connectionQuotas: ConnectionQuotas) extends AbstractServerThread(connectionQuotas) with KafkaMetricsGroup {
 
+  // 这个是acceptor的selector
   private val nioSelector = NSelector.open()
   val serverChannel = openServerSocket(endPoint.host, endPoint.port)
 
   this.synchronized {
+    // Process线程， 是在这里启动的
     processors.foreach { processor =>
       Utils.newThread("kafka-network-thread-%d-%s-%d".format(brokerId, endPoint.protocolType.toString, processor.id), processor, false).start()
     }
@@ -249,12 +270,26 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
 
   /**
    * Accept loop that checks for new connection attempts
+   *
+   * acceptor监听了9092端口号， 其实它相当于一个boss线程池， 接收连接事件
+   * processor相当于worker线程池， 处理一些非连接事件
    */
   def run() {
     serverChannel.register(nioSelector, SelectionKey.OP_ACCEPT)
     startupComplete()
     try {
       var currentProcessor = 0
+
+      /**
+       * kafka:
+       *  NIO网络通信
+       *  客户端：
+       *  服务端：
+       *  serverChannel
+       *
+       *  服务端启动， 客户端发送过来请求， 服务端对请求进行处理， 服务端给客户端发送响应
+       *  客户端接受到响应以后 -> 下一个请求的发送
+       */
       while (isRunning) {
         try {
           val ready = nioSelector.select(500)
@@ -265,9 +300,12 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
               try {
                 val key = iter.next
                 iter.remove()
-                if (key.isAcceptable)
+                // 如果是客户端发送过来的网络请求
+                if (key.isAcceptable) {
+                  // 那么就进行处理了
+                  // 随机的挑选了一个processor来进行这个连接
                   accept(key, processors(currentProcessor))
-                else
+                } else
                   throw new IllegalStateException("Unrecognized key state for acceptor thread.")
 
                 // round robin to the next processor thread
@@ -320,11 +358,16 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
 
   /*
    * Accept a new connection
+   *
+   * 接收一个新的网络请求
    */
   def accept(key: SelectionKey, processor: Processor) {
+    // 拿出serverSocketChannel
     val serverSocketChannel = key.channel().asInstanceOf[ServerSocketChannel]
+    // 建立连接
     val socketChannel = serverSocketChannel.accept()
     try {
+      // 配置这个channel
       connectionQuotas.inc(socketChannel.socket().getInetAddress)
       socketChannel.configureBlocking(false)
       socketChannel.socket().setTcpNoDelay(true)
@@ -337,6 +380,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                   socketChannel.socket.getSendBufferSize, sendBufferSize,
                   socketChannel.socket.getReceiveBufferSize, recvBufferSize))
 
+      // 处理器就专门处理这个socketChannel
       processor.accept(socketChannel)
     } catch {
       case e: TooManyConnectionsException =>
@@ -356,6 +400,10 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
 /**
  * Thread that processes all requests from a single connection. There are N of these running in parallel
  * each of which has its own selector
+ *
+ * 每个连接都有自己的process去处理所有的请求， 这个process会有多个， 并且， 他们有自己的选择器
+ *
+ * 这玩意， 就像是一个内部类一样
  */
 private[kafka] class Processor(val id: Int,
                                time: Time,
@@ -383,6 +431,8 @@ private[kafka] class Processor(val id: Int,
   }
 
   private val newConnections = new ConcurrentLinkedQueue[SocketChannel]()
+  // 在处理processCompletedSends的时候移除的
+  // 在处理processNewResponses的时候添加的
   private val inflightResponses = mutable.Map[String, RequestChannel.Response]()
   private val metricTags = Map("networkProcessor" -> id.toString).asJava
 
@@ -395,6 +445,7 @@ private[kafka] class Processor(val id: Int,
     metricTags.asScala
   )
 
+  // 你看每个process都有自己的一个selector
   private val selector = new KSelector(
     maxRequestSize,
     connectionsMaxIdleMs,
@@ -412,9 +463,20 @@ private[kafka] class Processor(val id: Int,
         // setup any new connections that have been queued up
         configureNewConnections()
         // register any new responses for writing
+        // 处理一些新的返回请求, 就是我们处理完客户发送过来的请求后， 我们还需要将一些消息返回给客户端去
+        // 一个死循环去这里拿response对象来处理， responseQueues
+        // responseQueues
         processNewResponses()
+        // 这里去等待， 新的请求
+        // stagedReceives暂存态的
+        // completedSends完成发送的
+        // stagedReceives -> completedReceive完成接收的
         poll()
+        // 处理完成接收的对象， 它们被前面的方法给放入到completedReceives集合中去了
+        // completedReceives -> requestQueue
         processCompletedReceives()
+        // 处理已经完成的发送事件
+        // inflightResponses中移除对象， 对应的每一个channel注册读事件
         processCompletedSends()
         processDisconnected()
       } catch {
@@ -443,8 +505,10 @@ private[kafka] class Processor(val id: Int,
             // that are sitting in the server's socket buffer
             curr.request.updateRequestMetrics
             trace("Socket server received empty response to send, registering for read: " + curr)
+            // 如果没有动作， 那么重新去注册一个读事件去
             selector.unmute(curr.request.connectionId)
           case RequestChannel.SendAction =>
+            // 如果是发送的动作， 走， 发送消息去了
             sendResponse(curr)
           case RequestChannel.CloseConnectionAction =>
             curr.request.updateRequestMetrics
@@ -460,6 +524,7 @@ private[kafka] class Processor(val id: Int,
   /* `protected` for test usage */
   protected[network] def sendResponse(response: RequestChannel.Response) {
     trace(s"Socket server received response to send, registering for write and sending data: $response")
+    // 去selector里， 看一下， 里面有存储这个channel没， 如果没有， 那么就算了， 记录一下就行了
     val channel = selector.channel(response.responseSend.destination)
     // `channel` can be null if the selector closed the connection because it was idle for too long
     if (channel == null) {
@@ -467,7 +532,9 @@ private[kafka] class Processor(val id: Int,
       response.request.updateRequestMetrics()
     }
     else {
+      // selector再去发送
       selector.send(response.responseSend)
+      // 这里面又放了个东西
       inflightResponses += (response.request.connectionId -> response)
     }
   }
@@ -486,11 +553,16 @@ private[kafka] class Processor(val id: Int,
   private def processCompletedReceives() {
     selector.completedReceives.asScala.foreach { receive =>
       try {
+        // 遍历收到的每一个receive
+        // 1. 拿到这个接收消息的channel
         val channel = selector.channel(receive.source)
         val session = RequestChannel.Session(new KafkaPrincipal(KafkaPrincipal.USER_TYPE, channel.principal.getName),
           channel.socketAddress)
+        // 解析请求, 这就里面就是去decoder， 从字节码中读出要的信息
         val req = RequestChannel.Request(processor = id, connectionId = receive.source, session = session, buffer = receive.payload, startTimeMs = time.milliseconds, securityProtocol = protocol)
+        // 同步到副本中去, 将这个request放入到一个集合中去
         requestChannel.sendRequest(req)
+        // 移除掉读事件， 为什么要移除呢， 因为processor要去处理发送事件了， 也就是写事件
         selector.mute(receive.source)
       } catch {
         case e @ (_: InvalidRequestException | _: SchemaException) =>
@@ -507,6 +579,7 @@ private[kafka] class Processor(val id: Int,
         throw new IllegalStateException(s"Send for ${send.destination} completed, but not in `inflightResponses`")
       }
       resp.request.updateRequestMetrics()
+      // 这个send.destination就是一把key, 去channel里找到对应的channel
       selector.unmute(send.destination)
     }
   }
@@ -526,7 +599,9 @@ private[kafka] class Processor(val id: Int,
    * Queue up a new connection for reading
    */
   def accept(socketChannel: SocketChannel) {
+    // 将连接放入到newConnections中去
     newConnections.add(socketChannel)
+    // selector唤醒
     wakeup()
   }
 
@@ -543,6 +618,7 @@ private[kafka] class Processor(val id: Int,
         val remoteHost = channel.socket().getInetAddress.getHostAddress
         val remotePort = channel.socket().getPort
         val connectionId = ConnectionId(localHost, localPort, remoteHost, remotePort).toString
+        // 把从acceptor那里获取到的channel给放入至selector中去
         selector.register(connectionId, channel)
       } catch {
         // We explicitly catch all non fatal exceptions and close the socket to avoid a socket leak. The other

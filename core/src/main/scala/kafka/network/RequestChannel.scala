@@ -58,6 +58,8 @@ object RequestChannel extends Logging {
     @volatile var responseDequeueTimeMs = -1L
     @volatile var apiRemoteCompleteTimeMs = -1L
 
+    // 得到字节， 然后解析这些字节
+    // short 代表请求id requestId
     val requestId = buffer.getShort()
 
     // TODO: this will be removed once we migrated to client-side format
@@ -76,6 +78,7 @@ object RequestChannel extends Logging {
 
     // if we failed to find a server-side mapping, then try using the
     // client-side request / response format
+    // 解析请求头
     val header: RequestHeader =
       if (requestObj == null) {
         buffer.rewind
@@ -86,20 +89,24 @@ object RequestChannel extends Logging {
         }
       } else
         null
-    val body: AbstractRequest =
+    val body: AbstractRequest = {
+      // 解析请求体
       if (requestObj == null)
         try {
           // For unsupported version of ApiVersionsRequest, create a dummy request to enable an error response to be returned later
           if (header.apiKey == ApiKeys.API_VERSIONS.id && !Protocol.apiVersionSupported(header.apiKey, header.apiVersion))
             new ApiVersionsRequest
-          else
+          else {
+            // 依赖于请求头的信息， 来判断， 使用什么样的手段去解析这个请求体， 是消息， 还是心跳， 还是元数据
             AbstractRequest.getRequest(header.apiKey, header.apiVersion, buffer)
+          }
         } catch {
           case ex: Throwable =>
             throw new InvalidRequestException(s"Error getting request for apiKey: ${header.apiKey} and apiVersion: ${header.apiVersion}", ex)
         }
       else
         null
+    }
 
     buffer = null
     private val requestLogger = Logger.getLogger("kafka.request.logger")
@@ -214,6 +221,7 @@ class RequestChannel(val numProcessors: Int, val queueSize: Int) extends KafkaMe
 
   /** Send a response back to the socket server to be sent over the network */
   def sendResponse(response: RequestChannel.Response) {
+    // 把消息给放入到一个队列里面去
     responseQueues(response.processor).put(response)
     for(onResponse <- responseListeners)
       onResponse(response.processor)

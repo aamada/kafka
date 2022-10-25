@@ -47,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * nioSelector接口是一个非阻塞多网络连接的网络IO
  * A nioSelector interface for doing non-blocking multi-connection network I/O.
  * <p>
  * This class works with {@link NetworkSend} and {@link NetworkReceive} to transmit size-delimited network requests and
@@ -61,6 +62,7 @@ import org.slf4j.LoggerFactory;
  * The connect call does not block on the creation of the TCP connection, so the connect method only begins initiating
  * the connection. The successful invocation of this method does not mean a valid connection has been established.
  *
+ * 基本上的操作都是通过poll()来操作的
  * Sending requests, receiving responses, processing connection completions, and disconnections on the existing
  * connections are all done using the <code>poll()</code> call.
  *
@@ -70,9 +72,11 @@ import org.slf4j.LoggerFactory;
  * nioSelector.poll(TIMEOUT_MS);
  * </pre>
  *
+ * nioSelector包括了几个list， 在调用poll()时， 这些个list会重置
  * The nioSelector maintains several lists that are reset by each call to <code>poll()</code> which are available via
  * various getters. These are reset by each call to <code>poll()</code>.
  *
+ * 这是一个非线程安全的类
  * This class is not thread safe!
  */
 public class Selector implements Selectable {
@@ -204,6 +208,7 @@ public class Selector implements Selectable {
         SelectionKey key = socketChannel.register(nioSelector, SelectionKey.OP_READ);
         KafkaChannel channel = channelBuilder.buildChannel(id, key, maxReceiveSize);
         key.attach(channel);
+        // 第二个集合
         this.channels.put(id, channel);
     }
 
@@ -283,15 +288,19 @@ public class Selector implements Selectable {
 
         /* check ready keys */
         long startSelect = time.nanoseconds();
+        // 在这里等待事件的发生
         int readyKeys = select(timeout);
         long endSelect = time.nanoseconds();
         this.sensors.selectTime.record(endSelect - startSelect, time.milliseconds());
 
         if (readyKeys > 0 || !immediatelyConnectedKeys.isEmpty()) {
+            // stagedReceives
+            // completedSends
             pollSelectionKeys(this.nioSelector.selectedKeys(), false, endSelect);
             pollSelectionKeys(immediatelyConnectedKeys, true, endSelect);
         }
 
+        // completedReceives
         addToCompletedReceives();
 
         long endIo = time.nanoseconds();
@@ -340,7 +349,9 @@ public class Selector implements Selectable {
                 /* if channel is ready read from any connections that have readable data */
                 if (channel.ready() && key.isReadable() && !hasStagedReceive(channel)) {
                     NetworkReceive networkReceive;
+                    // 这里还是读消息， 然后将这个读取完成的消息， 给放入到stagedReceive里面去
                     while ((networkReceive = channel.read()) != null)
+                        // 处理完成读事件， 将这个接收对象给放入到集合中去
                         addToStagedReceives(channel, networkReceive);
                 }
 
@@ -348,6 +359,7 @@ public class Selector implements Selectable {
                 if (channel.ready() && key.isWritable()) {
                     Send send = channel.write();
                     if (send != null) {
+                        // 写完成后， 将这个发送的对象给放入到completedSends集合中去
                         this.completedSends.add(send);
                         this.sensors.recordBytesSent(channel.id(), send.size());
                     }

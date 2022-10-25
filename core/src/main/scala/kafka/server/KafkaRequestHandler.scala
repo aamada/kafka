@@ -57,6 +57,7 @@ class KafkaRequestHandler(id: Int,
         }
         req.requestDequeueTimeMs = SystemTime.milliseconds
         trace("Kafka request handler %d on broker %d handling request %s".format(id, brokerId, req))
+        // 到这里来处理客户端的请求
         apis.handle(req)
       } catch {
         case e: Throwable => error("Exception when handling request", e)

@@ -359,6 +359,7 @@ class KafkaApis(val requestChannel: RequestChannel,
     }
 
     // the callback for sending a produce response
+    // 发送消息给生产者的一个回调函数
     def sendResponseCallback(responseStatus: Map[TopicPartition, PartitionResponse]) {
 
       val mergedResponseStatus = responseStatus ++ 
@@ -369,6 +370,7 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       var errorInResponse = false
 
+      // 记录日志， 忽略
       mergedResponseStatus.foreach { case (topicPartition, status) =>
         if (status.errorCode != Errors.NONE.code) {
           errorInResponse = true
@@ -382,6 +384,7 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       def produceResponseCallback(delayTimeMs: Int) {
         if (produceRequest.acks == 0) {
+          // 如果生产者的acks==0， 那么说明生产者不在乎这个返回值
           // no operation needed if producer request.required.acks = 0; however, if there is any error in handling
           // the request, since no response is expected by the producer, the server will close socket server so that
           // the producer client will know that some error has happened and will refresh its metadata
@@ -399,7 +402,10 @@ class KafkaApis(val requestChannel: RequestChannel,
             requestChannel.noOperation(request.processor, request)
           }
         } else {
+          // 这里就是说， 这里需要消息落库后， 再发送消息到生产者
+          // 消息头
           val respHeader = new ResponseHeader(request.header.correlationId)
+          // 消息体
           val respBody = request.header.apiVersion match {
             case 0 => new ProduceResponse(mergedResponseStatus.asJava)
             case version@(1 | 2) => new ProduceResponse(mergedResponseStatus.asJava, delayTimeMs, version)
@@ -408,6 +414,7 @@ class KafkaApis(val requestChannel: RequestChannel,
             case version => throw new IllegalArgumentException(s"Version `$version` of ProduceRequest is not handled. Code must be updated.")
           }
 
+          // 发送消息给到生产者
           requestChannel.sendResponse(new RequestChannel.Response(request, new ResponseSend(request.connectionId, respHeader, respBody)))
         }
       }
@@ -433,6 +440,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       // call the replica manager to append messages to the replicas
+      // 发送消息到副本主机上去
       replicaManager.appendMessages(
         produceRequest.timeout.toLong,
         produceRequest.acks,
