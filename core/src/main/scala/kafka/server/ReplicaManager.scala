@@ -162,6 +162,11 @@ class ReplicaManager(val config: KafkaConfig,
       scheduler.schedule("highwatermark-checkpoint", checkpointHighWatermarks, period = config.replicaHighWatermarkCheckpointIntervalMs, unit = TimeUnit.MILLISECONDS)
   }
 
+  /**
+   * 记录ISR的变化
+   *
+   * @param topicAndPartition
+   */
   def recordIsrChange(topicAndPartition: TopicAndPartition) {
     isrChangeSet synchronized {
       isrChangeSet += topicAndPartition
@@ -251,6 +256,12 @@ class ReplicaManager(val config: KafkaConfig,
     errorCode
   }
 
+  /**
+   * 停止副本？什么玩意？
+   *
+   * @param stopReplicaRequest 一个请求
+   * @return
+   */
   def stopReplicas(stopReplicaRequest: StopReplicaRequest): (mutable.Map[TopicPartition, Short], Short) = {
     replicaStateChangeLock synchronized {
       val responseMap = new collection.mutable.HashMap[TopicPartition, Short]
@@ -273,10 +284,12 @@ class ReplicaManager(val config: KafkaConfig,
   }
 
   def getOrCreatePartition(topic: String, partitionId: Int): Partition = {
+    // 主题对应的分区
     allPartitions.getAndMaybePut((topic, partitionId))
   }
 
   def getPartition(topic: String, partitionId: Int): Option[Partition] = {
+    // 从所有分区中拿到指定的分区
     val partition = allPartitions.get((topic, partitionId))
     if (partition == null)
       None
@@ -285,6 +298,7 @@ class ReplicaManager(val config: KafkaConfig,
   }
 
   def getReplicaOrException(topic: String, partition: Int): Replica = {
+    // 要不拿到副本， 要不就抛出异常
     val replicaOpt = getReplica(topic, partition)
     if(replicaOpt.isDefined)
       replicaOpt.get
@@ -293,6 +307,8 @@ class ReplicaManager(val config: KafkaConfig,
   }
 
   def getLeaderReplicaIfLocal(topic: String, partitionId: Int): Replica =  {
+    // 获取本地的主副本
+    // 将分区拿出来
     val partitionOpt = getPartition(topic, partitionId)
     partitionOpt match {
       case None =>
@@ -308,9 +324,11 @@ class ReplicaManager(val config: KafkaConfig,
   }
 
   def getReplica(topic: String, partitionId: Int, replicaId: Int = config.brokerId): Option[Replica] =  {
+    // 拿到partition
     val partitionOpt = getPartition(topic, partitionId)
     partitionOpt match {
       case None => None
+      // 取出来这个副本
       case Some(partition) => partition.getReplica(replicaId)
     }
   }
@@ -327,6 +345,7 @@ class ReplicaManager(val config: KafkaConfig,
 
     if (isValidRequiredAcks(requiredAcks)) {
       val sTime = SystemTime.milliseconds
+      // 写日志去了
       val localProduceResults = appendToLocalLog(internalTopicsAllowed, messagesPerPartition, requiredAcks)
       debug("Produce to local log in %d ms".format(SystemTime.milliseconds - sTime))
 

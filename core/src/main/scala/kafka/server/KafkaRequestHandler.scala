@@ -35,6 +35,7 @@ class KafkaRequestHandler(id: Int,
                           apis: KafkaApis) extends Runnable with Logging {
   this.logIdent = "[Kafka Request Handler " + id + " on Broker " + brokerId + "], "
 
+  // 处理的是requestQueue这个队列里的数据
   def run() {
     while(true) {
       try {
@@ -58,6 +59,7 @@ class KafkaRequestHandler(id: Int,
         req.requestDequeueTimeMs = SystemTime.milliseconds
         trace("Kafka request handler %d on broker %d handling request %s".format(id, brokerId, req))
         // 到这里来处理客户端的请求
+        // KafkaApis
         apis.handle(req)
       } catch {
         case e: Throwable => error("Exception when handling request", e)

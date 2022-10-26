@@ -118,6 +118,7 @@ class Partition(val topic: String,
   def leaderReplicaIfLocal(): Option[Replica] = {
     leaderReplicaIdOpt match {
       case Some(leaderReplicaId) =>
+        // 什么叫做主副本呢？就是这个副本的id=本brokerId的就是主副本
         if (leaderReplicaId == localBrokerId)
           getReplica(localBrokerId)
         else
@@ -425,6 +426,7 @@ class Partition(val topic: String,
     laggingReplicas
   }
 
+  // 写消息到主分区
   def appendMessagesToLeader(messages: ByteBufferMessageSet, requiredAcks: Int = 0) = {
     val (info, leaderHWIncremented) = inReadLock(leaderIsrUpdateLock) {
       val leaderReplicaOpt = leaderReplicaIfLocal()
@@ -440,6 +442,7 @@ class Partition(val topic: String,
               .format(topic, partitionId, inSyncSize, minIsr))
           }
 
+          // 写消息
           val info = log.append(messages, assignOffsets = true)
           // probably unblock some follower fetch requests since log end offset has been updated
           replicaManager.tryCompleteDelayedFetch(TopicPartitionOperationKey(this.topic, this.partitionId))

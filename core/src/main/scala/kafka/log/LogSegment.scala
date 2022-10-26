@@ -80,6 +80,9 @@ class LogSegment(val log: FileMessageSet,
    *
    * It is assumed this method is being called from within a lock.
    *
+   * 不是线程安全的
+   * todo 2022年10月26日08:52:17 走到这里了
+   *
    * @param firstOffset The first offset in the message set.
    * @param largestTimestamp The largest timestamp in the message set.
    * @param offsetOfLargestTimestamp The offset of the message that has the largest timestamp in the messages to append.
@@ -94,6 +97,11 @@ class LogSegment(val log: FileMessageSet,
       if (physicalPosition == 0)
         rollingBasedTimestamp = Some(largestTimestamp)
       // append the messages
+      // 追加消息
+      // 消息追加
+      // Index追加
+      // timestamp追加
+      // 重点， 这里才是真的写消息去了呀
       log.append(messages)
       // Update the in memory max timestamp and corresponding offset.
       if (largestTimestamp > maxTimestampSoFar) {
