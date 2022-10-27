@@ -145,18 +145,22 @@ class Log(val dir: File,
   def name  = dir.getName()
 
   /* Load the log segments from the log files on disk */
+  // 加载一些文件
   private def loadSegments() {
     // create the log directory if it doesn't exist
     dir.mkdirs()
     var swapFiles = Set[File]()
 
+    // 移除一些临时文件的操作， 再找到一些交换操作时， 产生的废弃的文件将其删除掉
     // first do a pass through the files in the log directory and remove any temporary files
     // and find any interrupted swap operations
     for(file <- dir.listFiles if file.isFile) {
+      // 遍历主题分区文件夹后， 得到里面的文件， 遍历里面的每一个文件
       if(!file.canRead)
         throw new IOException("Could not read file " + file)
       val filename = file.getName
       if(filename.endsWith(DeletedFileSuffix) || filename.endsWith(CleanedFileSuffix)) {
+        // 如果这个文件是以.deleted或者.cleaned结尾的， 直接删除掉
         // if the file ends in .deleted or .cleaned, delete it
         file.delete()
       } else if(filename.endsWith(SwapFileSuffix)) {
@@ -168,7 +172,10 @@ class Log(val dir: File,
           file.delete()
         } else if(baseName.getPath.endsWith(LogFileSuffix)){
           // delete the index
+          // 如果是以.log结尾的文件， 那么将这个文件的后缀改为.index?是这种骚操作吗？
           val index = new File(CoreUtils.replaceSuffix(baseName.getPath, LogFileSuffix, IndexFileSuffix))
+          // 这是什么鬼？直接删除了？
+          // 然后， 又将这个文件给删除了？这是什么操作？
           index.delete()
           swapFiles += file
         }
@@ -176,15 +183,20 @@ class Log(val dir: File,
     }
 
     // now do a second pass and load all the .log and all index files
+    // 现在我们来操作第二步， 加载那些.log及index的文件
     for(file <- dir.listFiles if file.isFile) {
       val filename = file.getName
       if(filename.endsWith(IndexFileSuffix) || filename.endsWith(TimeIndexFileSuffix)) {
+        // index文件或者timestamp文件
         // if it is an index file, make sure it has a corresponding .log file
         val logFile =
-          if (filename.endsWith(TimeIndexFileSuffix))
+          if (filename.endsWith(TimeIndexFileSuffix)) {
+            // timestamp
             new File(file.getAbsolutePath.replace(TimeIndexFileSuffix, LogFileSuffix))
-          else
+          } else {
+            // index
             new File(file.getAbsolutePath.replace(IndexFileSuffix, LogFileSuffix))
+          }
 
         if(!logFile.exists) {
           warn("Found an orphaned index file, %s, with no corresponding log file.".format(file.getAbsolutePath))
@@ -192,6 +204,7 @@ class Log(val dir: File,
         }
       } else if(filename.endsWith(LogFileSuffix)) {
         // if its a log file, load the corresponding log segment
+        // source 这里还要再看下去的 2022年10月27日22:13:03
         val start = filename.substring(0, filename.length - LogFileSuffix.length).toLong
         val indexFile = Log.indexFilename(dir, start)
         val timeIndexFile = Log.timeIndexFilename(dir, start)

@@ -644,6 +644,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
                                       maxIoBytesPerSecond = config.logCleanerIoMaxBytesPerSecond,
                                       backOffMs = config.logCleanerBackoffMs,
                                       enableCleaner = config.logCleanerEnable)
+    // ReplicaManager -> LogManager -> LogSegment -> KafkaFileManager
     new LogManager(logDirs = config.logDirs.map(new File(_)).toArray,
                    topicConfigs = configs,
                    defaultConfig = defaultLogConfig,

@@ -53,6 +53,7 @@ class LogSegment(val log: FileMessageSet,
   var created = time.milliseconds
 
   /* the number of bytes since we last added an entry in the offset index */
+   // 自从上次添加偏移量的索引后， byte的大小
   private var bytesSinceLastIndexEntry = 0
 
   /* The timestamp we used for time based log rolling */
@@ -62,7 +63,10 @@ class LogSegment(val log: FileMessageSet,
   @volatile private var maxTimestampSoFar = timeIndex.lastEntry.timestamp
   @volatile private var offsetOfMaxTimestamp = timeIndex.lastEntry.offset
 
-  def this(dir: File, startOffset: Long, indexIntervalBytes: Int, maxIndexSize: Int, rollJitterMs: Long, time: Time, fileAlreadyExists: Boolean = false, initFileSize: Int = 0, preallocate: Boolean = false) =
+  def this(dir: File, startOffset: Long, indexIntervalBytes: Int, maxIndexSize: Int, rollJitterMs: Long, time: Time, fileAlreadyExists: Boolean = false, initFileSize: Int = 0, preallocate: Boolean = false) = {
+    // FileMessageSet
+    // OffsetIndex
+    // TimeIndex
     this(new FileMessageSet(file = Log.logFilename(dir, startOffset), fileAlreadyExists = fileAlreadyExists, initFileSize = initFileSize, preallocate = preallocate),
          new OffsetIndex(Log.indexFilename(dir, startOffset), baseOffset = startOffset, maxIndexSize = maxIndexSize),
          new TimeIndex(Log.timeIndexFilename(dir, startOffset), baseOffset = startOffset, maxIndexSize = maxIndexSize),
@@ -70,8 +74,9 @@ class LogSegment(val log: FileMessageSet,
          indexIntervalBytes,
          rollJitterMs,
          time)
+  }
 
-  /* Return the size in bytes of this log segment */
+   /* Return the size in bytes of this log segment */
   def size: Long = log.sizeInBytes()
 
   /**
@@ -101,7 +106,7 @@ class LogSegment(val log: FileMessageSet,
       // 消息追加
       // Index追加
       // timestamp追加
-      // 重点， 这里才是真的写消息去了呀
+      // todo 重点， 这里才是真的写消息去了呀
       log.append(messages)
       // Update the in memory max timestamp and corresponding offset.
       if (largestTimestamp > maxTimestampSoFar) {
@@ -110,10 +115,13 @@ class LogSegment(val log: FileMessageSet,
       }
       // append an entry to the index (if needed)
       if(bytesSinceLastIndexEntry > indexIntervalBytes) {
+        // 写索引， 只有当索引达到一定量的时候， 才写索引， 所以这样的索引比较稀松, 稀松索引
         index.append(firstOffset, physicalPosition)
         timeIndex.maybeAppend(maxTimestampSoFar, offsetOfMaxTimestamp)
+        // 又将其置为了0
         bytesSinceLastIndexEntry = 0
       }
+      // 否则的话， 将这个消息的大小给加入到这个变量里面来
       bytesSinceLastIndexEntry += messages.sizeInBytes
     }
   }
@@ -320,8 +328,11 @@ class LogSegment(val log: FileMessageSet,
   @threadsafe
   def flush() {
     LogFlushStats.logFlushTimer.time {
+      // 写日志
       log.flush()
+      // 写索引
       index.flush()
+      // 写时间
       timeIndex.flush()
     }
   }

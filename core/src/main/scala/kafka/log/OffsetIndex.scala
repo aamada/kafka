@@ -119,11 +119,14 @@ class OffsetIndex(file: File, baseOffset: Long, maxIndexSize: Int = -1)
    * Append an entry for the given offset/location pair to the index. This entry must have a larger offset than all subsequent entries.
    */
   def append(offset: Long, position: Int) {
+    // 记录两个位置 ， 一个是逻辑上的位置 ， 一个是物理上的位置 ， 指定消息在磁盘上的位置
     inLock(lock) {
       require(!isFull, "Attempt to append to a full index (size = " + _entries + ").")
       if (_entries == 0 || offset > _lastOffset) {
         debug("Adding index entry %d => %d to %s.".format(offset, position, file.getName))
+        // 先写一个偏移量
         mmap.putInt((offset - baseOffset).toInt)
+        // 再写一个在磁盘上的位置
         mmap.putInt(position)
         _entries += 1
         _lastOffset = offset

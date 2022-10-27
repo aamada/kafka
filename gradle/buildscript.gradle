@@ -17,6 +17,7 @@ repositories {
   repositories {
     // For license plugin.
     maven {
+//      allowInsecureProtocol = true
       url 'http://dl.bintray.com/content/netflixoss/external-gradle-plugins/'
     }
   }
